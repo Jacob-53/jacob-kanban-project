@@ -1,0 +1,25 @@
+[project]
+name = "jacob-kanban-project"
+version = "0.1.0"
+description = "jacob's toy project"
+authors = [
+    {name = "jacob", email = "jacob8753@gmail.com"},
+]
+dependencies = ["fastapi>=0.115.12", "uvicorn>=0.34.1", "sqlalchemy>=2.0.40", "asyncpg>=0.30.0", "python-jose>=3.4.0", "bcrypt>=4.3.0"]
+requires-python = ">=3.12"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+
+[tool.pdm]
+distribution = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "pytest-cov>=6.1.1",
+]
