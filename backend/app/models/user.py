@@ -1,9 +1,6 @@
-# backend/app/models.py
-
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from app.database import Base
-
 
 class User(Base):
     __tablename__ = "users"
@@ -24,3 +21,4 @@ class Task(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
 
     owner = relationship("User", back_populates="tasks")
+

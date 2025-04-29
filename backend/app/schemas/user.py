@@ -1,19 +1,16 @@
 from pydantic import BaseModel
+from typing import List
 
 class TaskBase(BaseModel):
     title: str
     status: str = "TODO"
-
-class TaskCreate(TaskBase):
-    pass
 
 class Task(TaskBase):
     id: int
     user_id: int
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 class UserBase(BaseModel):
     username: str
@@ -22,9 +19,14 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     pass
 
+class UserUpdate(UserBase):
+    pass
+
 class User(UserBase):
     id: int
-    tasks: list[Task] = []
+    tasks: List[Task] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+
