@@ -10,8 +10,9 @@ router = APIRouter()
 
 # ✅ 태스크 생성 API
 @router.post("/tasks/", response_model=task_schema.Task)
-def create_task(task: task_schema.TaskCreate, user_id: int, db: Session = Depends(get_db)):
-    return task_crud.create_task(db=db, task=task, user_id=user_id)
+def create_task(task: task_schema.TaskCreate, db: Session = Depends(get_db)):
+    return task_crud.create_task(db=db, task=task)
+
 
 # ✅ 모든 태스크 조회 API
 @router.get("/tasks/", response_model=List[task_schema.Task])

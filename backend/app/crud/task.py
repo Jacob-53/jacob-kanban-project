@@ -3,8 +3,8 @@ from app import models
 from app.schemas import task as task_schema  # 스키마 분리된 task 임포트
 
 # 태스크 생성 함수
-def create_task(db: Session, task: task_schema.TaskCreate, user_id: int):
-    db_task = models.Task(**task.dict(), user_id=user_id)
+def create_task(db: Session, task: task_schema.TaskCreate):
+    db_task = models.Task(**task.dict())
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
