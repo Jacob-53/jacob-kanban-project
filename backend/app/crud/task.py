@@ -43,3 +43,11 @@ def get_tasks(db: Session, skip: int = 0, limit: int = 100):
 # 특정 태스크 조회
 def get_task(db: Session, task_id: int):
     return db.query(models.Task).filter(models.Task.id == task_id).first()
+
+# 특정 유저 태스크 조회
+def get_tasks_by_user_id(db: Session, user_id: int):
+    return db.query(models.Task).filter(models.Task.user_id == user_id).all()
+
+#전체 task 목록 조회
+def get_all_tasks(db: Session):
+    return db.query(models.Task).all()

@@ -50,3 +50,12 @@ def read_tasks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 @router.get("/tasks/{task_id}", response_model=task_schema.Task)
 def read_task(task_id: int, db: Session = Depends(get_db)):
     return task_crud.get_task(db, task_id=task_id)
+# 특정유저 task 조회
+@router.get("/users/{user_id}/tasks", response_model=list[task_schema.Task])
+def read_tasks_by_user(user_id: int, db: Session = Depends(get_db)):
+    return task_crud.get_tasks_by_user_id(db, user_id)
+
+# 전체 task 조회
+@router.get("/tasks/", response_model=list[task_schema.Task])
+def read_all_tasks(db: Session = Depends(get_db)):
+    return task_crud.get_all_tasks(db)
