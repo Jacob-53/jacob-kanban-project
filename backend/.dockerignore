@@ -4,4 +4,30 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# PDM virtual environment
+.venv/
+
+# Local development artifacts
+.env
+*.log
+
+# IDE files
+.vscode/
+.idea/
+
+# Tests & coverage
+htmlcov/
+.tox/
+.pytest_cache/
+.coverage
+*.coverage
+
+# OS files
+.DS_Store
+Thumbs.db
 
