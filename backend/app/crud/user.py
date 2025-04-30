@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.models import user as user_model
 from app.schemas import user as user_schema
+from app.utils import security
 
 def create_user(db: Session, user: user_schema.UserCreate):
     db_user = user_model.User(username=user.username, is_teacher=user.is_teacher)
@@ -35,3 +36,19 @@ def delete_user(db: Session, user_id: int):
     db.commit()
     return db_user
 
+# 유저생성시 비밀번호 해시 적용
+def create_user(db: Session, user: user_schema.UserCreate):
+    """
+    새로운 유저를 DB에 저장합니다.
+    비밀번호는 해싱하여 저장합니다.
+    """
+    hashed_pw = security.hash_password(user.password)
+    db_user = models.User(
+        username=user.username,
+        is_teacher=user.is_teacher,
+        hashed_password=hashed_pw
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
