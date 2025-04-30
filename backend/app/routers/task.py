@@ -43,3 +43,10 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Task not found")
     return db_task
 
+@router.get("/tasks/", response_model=list[task_schema.Task])
+def read_tasks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return task_crud.get_tasks(db, skip=skip, limit=limit)
+
+@router.get("/tasks/{task_id}", response_model=task_schema.Task)
+def read_task(task_id: int, db: Session = Depends(get_db)):
+    return task_crud.get_task(db, task_id=task_id)

@@ -36,3 +36,10 @@ def delete_task(db: Session, task_id: int):
         db.commit()
     return db_task
 
+# 모든 태스크 조회
+def get_tasks(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Task).offset(skip).limit(limit).all()
+
+# 특정 태스크 조회
+def get_task(db: Session, task_id: int):
+    return db.query(models.Task).filter(models.Task.id == task_id).first()
