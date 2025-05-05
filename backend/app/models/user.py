@@ -8,6 +8,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     is_teacher = Column(Boolean, default=False)
+    hashed_password = Column(String, nullable=False)   # ← 추가 (jwt)
 
     tasks = relationship("Task", back_populates="owner")
 

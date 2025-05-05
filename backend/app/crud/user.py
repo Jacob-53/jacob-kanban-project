@@ -1,7 +1,9 @@
 from sqlalchemy.orm import Session
+from app import models, schemas
 from app.models import user as user_model
 from app.schemas import user as user_schema
 from app.utils import security
+from app.utils.security import get_password_hash
 
 def create_user(db: Session, user: user_schema.UserCreate):
     db_user = user_model.User(username=user.username, is_teacher=user.is_teacher)
@@ -42,7 +44,7 @@ def create_user(db: Session, user: user_schema.UserCreate):
     새로운 유저를 DB에 저장합니다.
     비밀번호는 해싱하여 저장합니다.
     """
-    hashed_pw = security.hash_password(user.password)
+    hashed_pw = get_password_hash(user.password)
     db_user = models.User(
         username=user.username,
         is_teacher=user.is_teacher,
