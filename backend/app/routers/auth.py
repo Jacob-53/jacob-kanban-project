@@ -16,6 +16,8 @@ def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
+    print("▶ [DEBUG] form_data.username:", form_data.username)
+    print("▶ [DEBUG] form_data.password:", form_data.password)
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user:
         raise HTTPException(

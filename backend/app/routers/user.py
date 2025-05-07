@@ -1,38 +1,47 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas import user as user_schema
-from app.crud import user as user_crud
+from app.schemas.user import User as UserSchema, UserCreate
+from app.crud.user import (
+    create_user as create_user_crud,
+    get_user,
+    get_users,
+)
+from app.utils.security import get_current_user  # ← 추가
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/users",
+    tags=["users"],
+)
 
-@router.post("/users/", response_model=user_schema.User)
-def create_user(user: user_schema.UserCreate, db: Session = Depends(get_db)):
-    return user_crud.create_user(db=db, user=user)
+# 👉 회원가입은 공개
+@router.post("/", response_model=UserSchema)
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    return create_user_crud(db=db, user=user)
 
-@router.get("/users/", response_model=list[user_schema.User])
-def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return user_crud.get_users(db=db, skip=skip, limit=limit)
+# 👉 유저 전체 조회(관리자/교사 권한이 필요하다면 여기에 추가 검사)
+@router.get("/", response_model=list[UserSchema])
+def read_users(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),  # ← 인증 강제
+):
+    return get_users(db, skip=skip, limit=limit)
 
-@router.get("/users/{user_id}", response_model=user_schema.User)
-def read_user(user_id: int, db: Session = Depends(get_db)):
-    db_user = user_crud.get_user(db=db, user_id=user_id)
-    if db_user is None:
+# 👉 특정 유저 조회
+@router.get("/{user_id}", response_model=UserSchema)
+def read_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),  # ← 인증 강제
+):
+    db_user = get_user(db, user_id)
+    if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
     return db_user
 
-# ✅ 여기 추가: 업데이트 유저
-@router.put("/users/{user_id}", response_model=user_schema.User)
-def update_user(user_id: int, user_update: user_schema.UserUpdate, db: Session = Depends(get_db)):
-    db_user = user_crud.update_user(db=db, user_id=user_id, user_update=user_update)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return db_user
-
-# ✅ 여기 추가: 삭제 유저
-@router.delete("/users/{user_id}", response_model=user_schema.User)
-def delete_user(user_id: int, db: Session = Depends(get_db)):
-    db_user = user_crud.delete_user(db=db, user_id=user_id)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return db_user
+# 👉 내 정보 조회
+@router.get("/me", response_model=UserSchema)
+def read_users_me(current_user = Depends(get_current_user)):
+    return current_user

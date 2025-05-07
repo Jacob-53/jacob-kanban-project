@@ -4,6 +4,15 @@ from app.models import user as user_model
 from app.schemas import user as user_schema
 from app.utils import security
 from app.utils.security import get_password_hash
+from sqlalchemy.orm import Session
+from app.models import User as UserModel
+
+def get_user_by_username(db: Session, username: str) -> UserModel | None:
+    """
+    DB에서 username으로 User를 조회해 반환합니다.
+    로그인 검증 시 사용됩니다.
+    """
+    return db.query(UserModel).filter(UserModel.username == username).first()
 
 def create_user(db: Session, user: user_schema.UserCreate):
     db_user = user_model.User(username=user.username, is_teacher=user.is_teacher)
