@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas.task import Task as TaskSchema, TaskCreate, TaskUpdate
+from app.schemas.task import TaskSchema, TaskCreate, TaskUpdate  # 수정된 부분
 from app.crud.task import (
     create_task as create_task_crud,
     get_task,
@@ -9,7 +9,7 @@ from app.crud.task import (
     update_task as update_task_crud,
     delete_task as delete_task_crud,
 )
-from app.utils.security import get_current_user  # ← 추가
+from app.utils.security import get_current_user
 
 router = APIRouter(
     prefix="/tasks",
