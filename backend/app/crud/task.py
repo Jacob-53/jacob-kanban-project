@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app.models.task import Task  # Task 직접 임포트
 from app.schemas.task import TaskCreate, TaskSchema, TaskUpdate  # 스키마 임포트
 
+
 # 태스크 생성 함수
 def create_task(db: Session, task: TaskCreate):
     # 스키마 데이터를 딕셔너리로 변환

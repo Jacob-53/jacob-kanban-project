@@ -6,9 +6,23 @@ import asyncio
 from app.utils.background_tasks import start_background_tasks
 from app.routers import time_tracking
 from app.routers import help_request
+from app.routers import websocket
+
+
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # FastAPI 앱 생성
 app = FastAPI()
+
+# CORS 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 프로덕션에서는 구체적인 도메인으로 제한
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 데이터베이스 초기화 함수
 def init_db():
@@ -236,6 +250,8 @@ app.include_router(auth.router)
 app.include_router(stage.router)
 app.include_router(time_tracking.router)
 app.include_router(help_request.router)
+app.include_router(websocket.router)
+
 
 @app.get("/")
 def read_root():
@@ -245,3 +261,4 @@ def read_root():
 @app.on_event("startup")
 def startup_event():
     start_background_tasks()
+
