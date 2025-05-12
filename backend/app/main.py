@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.database import engine
-from app.routers import user, task, auth
+from app.routers import user, task, auth, stage
 from sqlalchemy import text
 
 # FastAPI 앱 생성
@@ -57,7 +57,8 @@ def init_db():
                     previous_stage VARCHAR,
                     new_stage VARCHAR NOT NULL,
                     changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    time_spent INTEGER
+                    time_spent INTEGER,
+                    comment VARCHAR
                 )
                 """,
                 """
@@ -103,7 +104,29 @@ def init_db():
                 except Exception as e:
                     print(f"인덱스 생성 중 오류 (무시 가능): {e}")
             
-            # PostgreSQL용 컬럼 존재 확인 후 추가
+            # 기존 테이블에 컬럼 추가 (이미 존재하는 경우 대비)
+            alter_statements = [
+                # task_histories 테이블에 comment 컬럼 추가
+                """
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (
+                        SELECT FROM information_schema.columns 
+                        WHERE table_name = 'task_histories' AND column_name = 'comment'
+                    ) THEN
+                        ALTER TABLE task_histories ADD COLUMN comment VARCHAR;
+                    END IF;
+                END $$;
+                """
+            ]
+            
+            for stmt in alter_statements:
+                try:
+                    conn.execute(text(stmt))
+                except Exception as e:
+                    print(f"컬럼 추가 중 오류 (무시 가능): {e}")
+            
+            # PostgreSQL용 컬럼 존재 확인 후 추가 (기존 코드 유지)
             statements = [
                 """
                 DO $$ 
@@ -197,6 +220,7 @@ init_db()
 app.include_router(user.router)
 app.include_router(task.router)
 app.include_router(auth.router)
+app.include_router(stage.router)
 
 @app.get("/")
 def read_root():

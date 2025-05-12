@@ -15,6 +15,7 @@ class TaskHistory(Base):
     new_stage = Column(Enum(TaskStage))
     changed_at = Column(DateTime, default=datetime.utcnow)
     time_spent = Column(Integer, nullable=True)
+    comment = Column(String, nullable=True)
     
     # 직접 클래스 참조로 변경
     task = relationship(Task, back_populates="task_histories")
