@@ -1,3 +1,4 @@
+# app/models/help_request.py
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -7,6 +8,7 @@ from .user import User  # 직접 클래스 임포트
 
 class HelpRequest(Base):
     __tablename__ = "help_requests"
+    __table_args__ = {'extend_existing': True}  # 충돌 방지를 위해 추가
     
     id = Column(Integer, primary_key=True, index=True)
     task_id = Column(Integer, ForeignKey("tasks.id"))
@@ -16,6 +18,7 @@ class HelpRequest(Base):
     resolved = Column(Boolean, default=False)
     resolved_at = Column(DateTime, nullable=True)
     resolved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    resolution_message = Column(String, nullable=True)  # 새로 추가된 필드
     
     # 직접 클래스 참조로 변경
     task = relationship(Task, back_populates="help_requests")
