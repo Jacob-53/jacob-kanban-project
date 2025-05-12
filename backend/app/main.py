@@ -2,6 +2,10 @@ from fastapi import FastAPI
 from app.database import engine
 from app.routers import user, task, auth, stage
 from sqlalchemy import text
+import asyncio
+from app.utils.background_tasks import start_background_tasks
+from app.routers import time_tracking
+
 
 # FastAPI 앱 생성
 app = FastAPI()
@@ -216,12 +220,20 @@ def init_db():
 # 앱 시작 시 DB 초기화
 init_db()
 
+
 # 라우터 등록
 app.include_router(user.router)
 app.include_router(task.router)
 app.include_router(auth.router)
 app.include_router(stage.router)
+app.include_router(time_tracking.router)
+
 
 @app.get("/")
 def read_root():
     return {"message": "Hello, FastAPI!"}
+
+# 앱 시작 시 백그라운드 태스크 실행
+@app.on_event("startup")
+def startup_event():
+    start_background_tasks()
