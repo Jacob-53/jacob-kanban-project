@@ -17,7 +17,7 @@ class UserBase(BaseModel):
     is_teacher: bool = False
 
 class UserCreate(UserBase):
-    pass
+    password: str      # ← 추가 JWT
 
 class UserUpdate(UserBase):
     pass
