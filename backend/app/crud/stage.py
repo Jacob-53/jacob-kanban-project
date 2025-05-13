@@ -5,6 +5,7 @@ from app.models.task import Task, TaskStage
 from app.models.task_history import TaskHistory
 from app.models.stage_config import StageConfig
 from app.schemas.stage import StageConfigCreate, StageConfigUpdate
+from app.utils.websocket_manager import manager
 
 # 단계 이동 함수
 def move_task_stage(db: Session, task_id: int, user_id: int, new_stage: str, comment: str = None):
@@ -49,6 +50,22 @@ def move_task_stage(db: Session, task_id: int, user_id: int, new_stage: str, com
     db.commit()
     db.refresh(task)
     db.refresh(history)
+
+     # WebSocket 알림 전송
+    import asyncio
+    asyncio.create_task(
+        manager.send_task_update(
+            task_id=task_id,
+            user_id=str(task.user_id),
+            update_type="stage_changed",
+            data={
+                "previous_stage": previous_stage,
+                "new_stage": new_stage,
+                "time_spent": time_spent,
+                "comment": comment
+            }
+        )
+    )
     
     return {"task": task, "history": history}
 

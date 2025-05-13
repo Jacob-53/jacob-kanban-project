@@ -7,6 +7,7 @@ from app.models.user import User
 from app.models.task_history import TaskHistory
 from app.models.stage_config import StageConfig
 from typing import List, Optional
+from app.utils.websocket_manager import manager
 
 def check_delayed_tasks(db: Session, threshold_percentage: float = 100.0):
     """
@@ -47,7 +48,18 @@ def check_delayed_tasks(db: Session, threshold_percentage: float = 100.0):
                 if task.is_delayed != is_delayed:
                     task.is_delayed = is_delayed
                     db.commit()
-                
+
+                    if is_delayed:
+                        import asyncio
+                        asyncio.create_task(
+                            manager.send_delay_notification(
+                                task_id=task.id,
+                                user_id=str(task.user_id),
+                                expected_time=expected_minutes,
+                                elapsed_time=elapsed_minutes
+                            )
+                        )
+                        
                 # 지연된 태스크만 결과에 추가
                 if is_delayed:
                     # 사용자 정보 조회

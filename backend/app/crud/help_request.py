@@ -6,6 +6,7 @@ from app.models.user import User
 from app.models.task import Task
 from app.schemas.help_request import HelpRequestCreate, HelpRequestUpdate
 from typing import List, Optional
+from app.utils.websocket_manager import manager
 
 def create_help_request(db: Session, user_id: int, help_request: HelpRequestCreate):
     """
@@ -48,6 +49,16 @@ def create_help_request(db: Session, user_id: int, help_request: HelpRequestCrea
     db.add(db_help_request)
     db.commit()
     db.refresh(db_help_request)
+    # WebSocket 알림 전송 (비동기 함수를 동기 환경에서 실행)
+    import asyncio
+    asyncio.create_task(
+        manager.send_help_request_notification(
+            help_request_id=db_help_request.id,
+            task_id=db_help_request.task_id,
+            user_id=str(user_id),
+            message=db_help_request.message or "도움이 필요합니다."
+        )
+    )
     return db_help_request
 
 def get_help_requests(db: Session, 
@@ -111,6 +122,17 @@ def resolve_help_request(db: Session, help_request_id: int, resolver_id: int,
     
     db.commit()
     db.refresh(help_request)
+    # WebSocket 알림 전송 (비동기 함수를 동기 환경에서 실행)
+    import asyncio
+    asyncio.create_task(
+        manager.send_help_resolved_notification(
+            help_request_id=help_request.id,
+            task_id=help_request.task_id,
+            user_id=str(help_request.user_id),
+            resolver_id=str(resolver_id),
+            resolution_message=update_data.resolution_message or "도움 요청이 해결되었습니다."
+        )
+    )
     return help_request
 
 def format_help_request_response(db: Session, help_request: HelpRequest):
