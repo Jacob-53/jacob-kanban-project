@@ -1,7 +1,6 @@
 // src/app/layout.tsx
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import Sidebar from '@/components/layout/Sidebar';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -20,9 +19,6 @@ export default function RootLayout({
     <html lang="ko">
       {/* 화면 전체를 flex 레이아웃으로, 최소 높이를 화면 높이로 설정 */}
       <body className={`${inter.className} flex min-h-screen`}>
-        {/* 1) 사이드바 */}
-        <Sidebar />
-
         {/* 2) 메인 컨텐츠: 사이드바 옆에 flex-1로 채움 */}
         <main className="flex-1">
           {children}
