@@ -161,12 +161,12 @@ export const useAuthStore = create<AuthState>()(
           
           // 백엔드 코드에 맞는 정확한 엔드포인트 사용
           console.log('사용자 정보 요청 시작: /users/me');
-          const response = await fetch(`${API_URL}/users/me`, {
+          const response = await fetch(`${API_URL}/users/me/`, {
             method: 'GET',
             headers: {
               'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
+              //'Content-Type': 'application/json',
+              //'Accept': 'application/json'
             }
           });
           

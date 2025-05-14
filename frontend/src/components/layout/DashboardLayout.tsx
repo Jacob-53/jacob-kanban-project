@@ -64,14 +64,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   // 인증된 경우 대시보드 레이아웃 표시
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex flex-col flex-1 h-screen bg-gray-50">
         <Navbar />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4">
           {children}
         </main>
       </div>
-    </div>
   );
 }
