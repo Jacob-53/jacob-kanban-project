@@ -1,6 +1,5 @@
-// src/components/layout/DashboardLayout.tsx
 'use client';
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import Navbar from './Navbar';
@@ -11,30 +10,37 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { isAuthenticated, isLoading, loadUser } = useAuthStore();
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const { user, isAuthenticated, isLoading, loadUser } = useAuthStore();
   const router = useRouter();
 
-  // 첫 마운트 시 사용자 정보 로드
+  // 마운트 시 사용자 정보 로드
   useEffect(() => {
-    console.log('DashboardLayout 마운트, 사용자 정보 로드 시도');
-    const initAuth = async () => {
-      await loadUser();
-      setInitialLoadDone(true);
+    const checkAuth = async () => {
+      console.log('현재 인증 상태:', isAuthenticated);
+      
+      if (!isAuthenticated) {
+        // 토큰이 있으면 사용자 정보 로드 시도
+        if (localStorage.getItem('token')) {
+          console.log('토큰 존재. 사용자 정보 로드 시도');
+          await loadUser();
+          
+          // 로드 후에도 인증이 안 되면 로그인 페이지로
+          if (!useAuthStore.getState().isAuthenticated) {
+            console.log('토큰 있지만 유효하지 않음. 로그인 페이지로 이동');
+            router.push('/auth/login');
+          }
+        } else {
+          // 토큰 없으면 로그인 페이지로
+          console.log('토큰 없음. 로그인 페이지로 이동');
+          router.push('/auth/login');
+        }
+      }
     };
-    initAuth();
-  }, [loadUser]);
+    
+    checkAuth();
+  }, [isAuthenticated, loadUser, router]);
 
-  // 인증 상태 변경 시 리다이렉트
-  useEffect(() => {
-    if (initialLoadDone && !isLoading && !isAuthenticated) {
-      console.log('인증되지 않음, 로그인 페이지로 이동');
-      router.push('/auth/login');
-    }
-  }, [isAuthenticated, isLoading, initialLoadDone, router]);
-
-  // 로딩 중이거나 초기 로드가 완료되지 않았으면 로딩 표시
-  if (isLoading || !initialLoadDone) {
+  if (isLoading) {
     return (
       <div className="h-screen flex justify-center items-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
@@ -42,12 +48,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     );
   }
 
-  // 인증되지 않았으면 아무것도 렌더링하지 않음
   if (!isAuthenticated) {
-    return null; // 리다이렉트 대기
+    // 인증 확인 중 또는 실패 시 빈 화면 (로그인 페이지로 리디렉션 대기)
+    return null;
   }
 
-  // 인증된 경우 대시보드 레이아웃 표시
+  // 인증된 경우 레이아웃 표시
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
