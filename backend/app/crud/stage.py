@@ -1,6 +1,8 @@
 # app/crud/stage.py
 from sqlalchemy.orm import Session
 from datetime import datetime
+import threading
+import asyncio
 from app.models.task import Task, TaskStage
 from app.models.task_history import TaskHistory
 from app.models.stage_config import StageConfig
@@ -51,21 +53,35 @@ def move_task_stage(db: Session, task_id: int, user_id: int, new_stage: str, com
     db.refresh(task)
     db.refresh(history)
 
-     # WebSocket 알림 전송
-    import asyncio
-    asyncio.create_task(
-        manager.send_task_update(
-            task_id=task_id,
-            user_id=str(task.user_id),
-            update_type="stage_changed",
-            data={
-                "previous_stage": previous_stage,
-                "new_stage": new_stage,
-                "time_spent": time_spent,
-                "comment": comment
-            }
-        )
-    )
+    # WebSocket 알림 전송 - 별도 스레드에서 비동기 작업 실행
+    def run_async_task():
+        try:
+            # 새 이벤트 루프 생성
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # 이벤트 루프에서 비동기 함수 실행
+            loop.run_until_complete(
+                manager.send_task_update(
+                    task_id=task_id,
+                    user_id=str(task.user_id),
+                    update_type="stage_changed",
+                    data={
+                        "previous_stage": previous_stage,
+                        "new_stage": new_stage,
+                        "time_spent": time_spent,
+                        "comment": comment
+                    }
+                )
+            )
+            loop.close()
+        except Exception as e:
+            print(f"알림 전송 중 오류 발생: {e}")
+    
+    # 새 스레드에서 비동기 작업 실행
+    thread = threading.Thread(target=run_async_task)
+    thread.daemon = True
+    thread.start()
     
     return {"task": task, "history": history}
 
