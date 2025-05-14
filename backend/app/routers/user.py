@@ -29,6 +29,11 @@ def read_users(
 ):
     return get_users(db, skip=skip, limit=limit)
 
+# 👉 내 정보 조회
+@router.get("/me", response_model=UserSchema)
+def read_users_me(current_user = Depends(get_current_user)):
+    return current_user
+
 # 👉 특정 유저 조회
 @router.get("/{user_id}", response_model=UserSchema)
 def read_user(
@@ -40,8 +45,3 @@ def read_user(
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
     return db_user
-
-# 👉 내 정보 조회
-@router.get("/me", response_model=UserSchema)
-def read_users_me(current_user = Depends(get_current_user)):
-    return current_user
