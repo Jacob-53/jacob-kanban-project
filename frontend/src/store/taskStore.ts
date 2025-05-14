@@ -94,10 +94,14 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
   
   moveTaskStage: async (id, stageData) => {
     try {
+      console.log('태스크 단계 이동 시작:', id, stageData);
       const response = await api.put(`/tasks/${id}/stage`, stageData);
+      console.log('단계 이동 응답:', response.data);
+      
       // 서버에서 최신 태스크 정보 다시 가져오기
       const updatedTaskResponse = await api.get<Task>(`/tasks/${id}`);
       const updatedTask = updatedTaskResponse.data;
+      console.log('업데이트된 태스크:', updatedTask);
       
       // 상태 업데이트
       set(state => ({ 
@@ -106,6 +110,7 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
       
       return response.data;
     } catch (error: any) {
+      console.error('태스크 이동 오류:', error);
       set({ 
         error: error.response?.data?.detail || '태스크 단계 이동에 실패했습니다.'
       });
@@ -115,10 +120,19 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
   
   requestHelp: async (id, message) => {
     try {
-      const response = await api.post(`/tasks/${id}/help-request`, { message });
+      console.log('도움 요청 시작:', id, message);
+      
+      // 백엔드 API 경로를 /help-requests/로 수정
+      const response = await api.post('/help-requests/', { 
+        task_id: id,
+        message: message || ''
+      });
+      console.log('도움 요청 응답:', response.data);
+      
       // 서버에서 최신 태스크 정보 다시 가져오기
       const updatedTaskResponse = await api.get<Task>(`/tasks/${id}`);
       const updatedTask = updatedTaskResponse.data;
+      console.log('업데이트된 태스크:', updatedTask);
       
       // 상태 업데이트
       set(state => ({ 
@@ -127,6 +141,7 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
       
       return response.data;
     } catch (error: any) {
+      console.error('도움 요청 오류:', error);
       set({ 
         error: error.response?.data?.detail || '도움 요청에 실패했습니다.'
       });

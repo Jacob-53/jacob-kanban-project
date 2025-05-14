@@ -4,14 +4,17 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
+import { UserLoginRequest } from '@/types';
 
 export default function LoginForm() {
-  const [credentials, setCredentials] = useState({
+  const [credentials, setCredentials] = useState<UserLoginRequest>({
     username: '',
     password: ''
   });
-  const { login, isLoading, error } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { login } = useAuthStore();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -20,13 +23,16 @@ export default function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    
     try {
       console.log('로그인 시도:', credentials);
       
       // 로그인 시도
       await login(credentials);
       
-      // 로그인 성공 여부 확인 (로그인 함수에서 상태를 설정하므로)
+      // 로그인 성공 여부 확인
       const isAuthenticated = useAuthStore.getState().isAuthenticated;
       
       if (isAuthenticated) {
@@ -34,9 +40,24 @@ export default function LoginForm() {
         router.push('/dashboard');
       } else {
         console.log('로그인 함수는 성공했지만 인증 상태가 설정되지 않음');
+        setError('인증에 실패했습니다. 다시 시도해주세요.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('로그인 처리 중 오류:', error);
+      // 오류 메시지 설정 (사용자에게 표시)
+      setError(error.message || '로그인에 실패했습니다. 다시 시도해주세요.');
+      
+      // 인증 상태 명시적 초기화 (zustand store 접근)
+      useAuthStore.setState({ 
+        isAuthenticated: false,
+        user: null,
+        error: error.message || '로그인에 실패했습니다.'
+      });
+      
+      // 로컬 스토리지에서 토큰 제거 (혹시 있을 경우)
+      localStorage.removeItem('token');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -56,7 +77,9 @@ export default function LoginForm() {
           )}
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="username" className="sr-only">아이디</label>
+              <label htmlFor="username" className="sr-only">
+                사용자명
+              </label>
               <input
                 id="username"
                 name="username"
@@ -65,7 +88,7 @@ export default function LoginForm() {
                 value={credentials.username}
                 onChange={handleChange}
                 className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="아이디"
+                placeholder="사용자명"
               />
             </div>
             <div>
@@ -93,7 +116,7 @@ export default function LoginForm() {
           </div>
           <div className="text-center text-sm">
             <Link href="/auth/register" className="text-indigo-600 hover:text-indigo-800">
-              계정이 없으신가요? 회원가입
+              계정이 없으신가요? 가입하기
             </Link>
           </div>
         </form>

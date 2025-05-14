@@ -1,4 +1,5 @@
 // src/types/index.ts
+// 기본 ID 타입
 export type ID = number;
 
 // 사용자 관련 타입
@@ -27,13 +28,13 @@ export interface AuthResponse {
 }
 
 // Task 관련 타입
-export type TaskStage = 
-  | 'todo' 
-  | 'requirements' 
-  | 'design' 
-  | 'implementation' 
-  | 'testing' 
-  | 'review' 
+export type TaskStage =
+  | 'todo'
+  | 'requirements'
+  | 'design'
+  | 'implementation'
+  | 'testing'
+  | 'review'
   | 'done';
 
 export interface Task {
@@ -67,22 +68,13 @@ export interface TaskUpdate {
   expected_time?: number;
 }
 
-// Stage 관련 타입
-export interface StageConfig {
-  id: ID;
-  task_id: ID;
-  stage: TaskStage;
-  expected_time: number;
-  description?: string;
-  order: number;
-}
-
+// 단계 이동 타입
 export interface StageMove {
   stage: TaskStage;
   comment?: string;
 }
 
-// 도움 요청 관련 타입
+// 도움 요청 타입
 export interface HelpRequest {
   id: ID;
   task_id: ID;
@@ -94,7 +86,7 @@ export interface HelpRequest {
   resolved_by?: ID;
 }
 
-// 웹소켓 이벤트 타입
+// 이벤트 타입
 export interface TaskUpdateEvent {
   task_id: ID;
   type: 'stage_change' | 'help_request' | 'delay_detected';

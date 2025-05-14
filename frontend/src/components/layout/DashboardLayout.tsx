@@ -1,3 +1,4 @@
+// src/components/layout/DashboardLayout.tsx
 'use client';
 import { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,36 +11,44 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { user, isAuthenticated, isLoading, loadUser } = useAuthStore();
+  const { isAuthenticated, isLoading, loadUser } = useAuthStore();
   const router = useRouter();
 
-  // 마운트 시 사용자 정보 로드
+  // 컴포넌트 마운트 시 사용자 정보 로드
   useEffect(() => {
     const checkAuth = async () => {
-      console.log('현재 인증 상태:', isAuthenticated);
+      await loadUser();
       
-      if (!isAuthenticated) {
-        // 토큰이 있으면 사용자 정보 로드 시도
-        if (localStorage.getItem('token')) {
-          console.log('토큰 존재. 사용자 정보 로드 시도');
-          await loadUser();
-          
-          // 로드 후에도 인증이 안 되면 로그인 페이지로
-          if (!useAuthStore.getState().isAuthenticated) {
-            console.log('토큰 있지만 유효하지 않음. 로그인 페이지로 이동');
-            router.push('/auth/login');
-          }
-        } else {
-          // 토큰 없으면 로그인 페이지로
-          console.log('토큰 없음. 로그인 페이지로 이동');
-          router.push('/auth/login');
-        }
+      // 로컬 스토리지에 토큰이 있는지 확인
+      const token = localStorage.getItem('token');
+      const isAuth = useAuthStore.getState().isAuthenticated;
+      
+      console.log('DashboardLayout 인증 확인:', { 
+        token: !!token, 
+        isAuthenticated: isAuth 
+      });
+      
+      // 인증되지 않은 경우 로그인 페이지로 리디렉션
+      if (!token || !isAuth) {
+        console.log('인증되지 않음, 로그인 페이지로 리디렉션');
+        router.push('/auth/login');
       }
     };
     
     checkAuth();
-  }, [isAuthenticated, loadUser, router]);
+  }, [loadUser, router]);
 
+  // 인증 상태 변경 감지
+  useEffect(() => {
+    console.log('인증 상태 변경:', isAuthenticated);
+    
+    if (!isLoading && !isAuthenticated) {
+      console.log('인증 상태 확인: 인증되지 않음, 로그인 페이지로 리디렉션');
+      router.push('/auth/login');
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  // 로딩 중인 경우 로딩 인디케이터 표시
   if (isLoading) {
     return (
       <div className="h-screen flex justify-center items-center">
@@ -48,12 +57,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     );
   }
 
+  // 인증되지 않은 경우 빈 컴포넌트 반환 (리디렉션이 진행 중일 것임)
   if (!isAuthenticated) {
-    // 인증 확인 중 또는 실패 시 빈 화면 (로그인 페이지로 리디렉션 대기)
     return null;
   }
 
-  // 인증된 경우 레이아웃 표시
+  // 인증된 경우 대시보드 레이아웃 표시
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
