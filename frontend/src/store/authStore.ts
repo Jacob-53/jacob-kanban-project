@@ -96,44 +96,43 @@ export const useAuthStore = create<AuthState>()(
         }
       },
       
+      // src/store/authStore.ts 내 register 부분
       register: async (userData) => {
+        console.log('[authStore.register] 호출된 userData →', userData);
         set({ isLoading: true, error: null });
         try {
           const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-          
           const response = await fetch(`${API_URL}/users/`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(userData)
           });
-          
-          // 응답 상태 확인 및 오류 처리 개선
+          console.log('[authStore.register] 응답 상태(status) →', response.status);
+
           if (!response.ok) {
             let errorMessage = `회원가입 실패: ${response.status}`;
-            
             try {
               const errorData = await response.json();
-              if (errorData && typeof errorData === 'object' && 'detail' in errorData) {
+              console.log('[authStore.register] 에러 응답 바디 →', errorData);
+              if (errorData?.detail) {
                 errorMessage = errorData.detail;
               }
-            } catch (jsonError) {
-              // JSON 파싱 오류 무시하고 기본 오류 메시지 사용
-              console.error('응답 JSON 파싱 오류:', jsonError);
+            } catch {
+              // JSON 파싱 실패 시 무시
             }
-            
             throw new Error(errorMessage);
           }
-          
+
+          console.log('[authStore.register] 회원가입 성공 → 로그인 호출 전');
           set({ isLoading: false });
-          // 회원가입 후 자동 로그인 (선택사항)
+          
+          // 자동 로그인 호출
           await get().login({
             username: userData.username,
             password: userData.password
           });
         } catch (error: any) {
-          console.error('회원가입 오류:', error);
+          console.error('[authStore.register] 회원가입 오류 →', error.message);
           set({
             error: error.message || '회원가입에 실패했습니다',
             isLoading: false

@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/store/authStore';
 import Link from 'next/link';
 
 export default function RegisterForm() {
@@ -15,6 +16,7 @@ export default function RegisterForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { register } = useAuthStore(); // ← register 함수 가져오기
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -27,6 +29,7 @@ export default function RegisterForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // 1) 비밀번호와 비밀번호 확인이 일치해야만 진행
     if (formData.password !== formData.confirmPassword) {
       setError('비밀번호가 일치하지 않습니다.');
       return;
@@ -36,20 +39,26 @@ export default function RegisterForm() {
     setError(null);
     
     try {
-      // 실제 회원가입 로직은 auth 스토어를 사용하여 구현
-      // await register({
-      //   username: formData.username,
-      //   password: formData.password,
-      //   is_teacher: formData.is_teacher
-      // });
-      console.log('회원가입 시도:', formData);
+      // 2) register 호출 → backend 의 POST /users/ 엔드포인트로 전달
+      console.log('[RegisterForm] 회원가입 시도 →', {
+        username: formData.username,
+        password: formData.password,
+        is_teacher: formData.is_teacher
+      });
       
-      // 임시로 성공한 것처럼 처리 (나중에 실제 로직으로 교체)
-      setTimeout(() => {
-        router.push('/auth/login');
-      }, 1000);
-    } catch (error: any) {
-      setError(error.message || '회원가입에 실패했습니다.');
+      await register({
+        username: formData.username,
+        password: formData.password,
+        is_teacher: formData.is_teacher
+      });
+      
+      // 3) register가 성공하면 내부에서 자동 로그인 후 isAuthenticated가 true가 되어 있을 것
+      //    → /dashboard 로 이동하거나, 로그인 페이지로 이동
+      console.log('[RegisterForm] 회원가입 및 자동 로그인 성공');
+      router.push('/dashboard');
+    } catch (err: any) {
+      console.error('[RegisterForm] 회원가입 오류 →', err.message);
+      setError(err.message || '회원가입에 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
