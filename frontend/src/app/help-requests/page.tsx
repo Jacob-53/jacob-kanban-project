@@ -3,30 +3,31 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useHelpRequests } from '@/hooks/useHelpRequests';
-import { useAuth } from '@/hooks/useAuth';
 import { useSearchParams } from 'next/navigation';
+import { useAuthStore } from '@/store/authStore';
 
 export default function HelpRequestsPage() {
   const searchParams = useSearchParams();
   const resolvedFilter = searchParams.get('resolved') === 'true';
 
-  const { token } = useAuth();
+  const token = useAuthStore((state) => state.token);
   const { helpRequests, fetchList, loading, error } = useHelpRequests(token || '');
 
   useEffect(() => {
-    if (!token) return;
-    fetchList(resolvedFilter);
+    if (token) {
+      fetchList(resolvedFilter);
+    }
   }, [fetchList, resolvedFilter, token]);
 
   if (!token) {
     return (
       <div className="p-6 text-center">
-        <p className="mb-4 text-gray-500">로그인이 필요합니다.</p>
+        <p className="mb-4 text-gray-500">Login is required.</p>
         <Link
           href="/login"
           className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
-          로그인 하러 가기
+          Go to Login
         </Link>
       </div>
     );

@@ -1,100 +1,59 @@
 // src/api/helpRequests.ts
-import axios from 'axios';
+import axios, { AxiosHeaders } from 'axios';
+import { HelpRequest, CreateHelpRequestPayload, ResolveHelpRequestPayload } from '../types';
 
-// Base URL: 로컬 테스트용
 const api = axios.create({
   baseURL: 'http://localhost:8000',
   headers: {
     'Content-Type': 'application/json',
-  },
+  }
 });
 
-// 요청·응답 타입 정의
-export interface HelpRequest {
-  id: number;
-  task_id: number;
-  user_id: number;
-  username: string;
-  task_title: string;
-  message: string;
-  requested_at: string;   // ISO timestamp
-  resolved: boolean;
-  resolved_at: string | null;
-  resolved_by: number | null;
-  resolver_name: string | null;
-  resolution_message: string | null;
-}
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('token');
 
-export interface CreateHelpRequestPayload {
-  task_id: number;
-  message: string;
-}
+  if (!config.headers || !(config.headers instanceof AxiosHeaders)) {
+    config.headers = AxiosHeaders.from(config.headers || {});
+  }
 
-export interface ResolveHelpRequestPayload {
-  resolved: boolean;
-  resolution_message: string;
-}
+  if (token) {
+    config.headers.set('Authorization', `Bearer ${token}`);
+  }
 
-// API 함수
-/**
- * 새 Help Request 생성
- */
-export const createHelpRequest = async (
-  payload: CreateHelpRequestPayload,
-  token: string
-): Promise<HelpRequest> => {
-  const { data } = await api.post<HelpRequest>(
-    '/help-requests/',
-    payload,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  return data;
-};
+  return config;
+});
 
-/**
- * Help Request 목록 조회
- * @param resolved 필터: true/false
- */
+export default api;
+
+// API 함수들
+
 export const getHelpRequests = async (
-  resolved: boolean,
-  token: string
+  resolved: boolean
 ): Promise<HelpRequest[]> => {
-  const { data } = await api.get<HelpRequest[]>(
-    '/help-requests/',
-    {
-      headers: { Authorization: `Bearer ${token}` },
-      params: { resolved },
-    }
-  );
+  const { data } = await api.get('/help-requests/', {
+    params: { resolved },
+  });
   return data;
 };
 
-/**
- * 단건 조회
- */
 export const getHelpRequest = async (
-  id: number,
-  token: string
+  id: number
 ): Promise<HelpRequest> => {
-  const { data } = await api.get<HelpRequest>(
-    `/help-requests/${id}`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  const { data } = await api.get(`/help-requests/${id}`);
   return data;
 };
 
-/**
- * 해결 처리
- */
+export const createHelpRequest = async (
+  payload: CreateHelpRequestPayload
+): Promise<HelpRequest> => {
+  const { data } = await api.post('/help-requests/', payload);
+  return data;
+};
+
 export const resolveHelpRequest = async (
   id: number,
-  payload: ResolveHelpRequestPayload,
-  token: string
+  payload: ResolveHelpRequestPayload
 ): Promise<HelpRequest> => {
-  const { data } = await api.put<HelpRequest>(
-    `/help-requests/${id}/resolve`,
-    payload,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  const { data } = await api.put(`/help-requests/${id}/resolve`, payload);
   return data;
 };

@@ -84,6 +84,20 @@ export interface HelpRequest {
   resolved: boolean;
   resolved_at?: string;
   resolved_by?: ID;
+  resolution_message?: string;
+  resolver_name?: string;
+  task_title?: string;
+  username?: string;
+}
+
+export interface CreateHelpRequestPayload {
+  task_id: number;
+  message: string;
+}
+
+export interface ResolveHelpRequestPayload {
+  resolved: boolean;
+  resolution_message: string;
 }
 
 // 이벤트 타입

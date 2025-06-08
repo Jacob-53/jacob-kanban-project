@@ -17,6 +17,7 @@ export default function AdminStatsPage() {
 
   useEffect(() => {
     const fetchStats = async () => {
+      if (!token) return;
       const res = await fetch("/admin/stats/overview", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -27,6 +28,7 @@ export default function AdminStatsPage() {
     fetchStats();
   }, [token]);
 
+  if (!token) return <div className="p-6">Unauthorized</div>;
   if (!stats) return <div className="p-6">Loading...</div>;
 
   return (
