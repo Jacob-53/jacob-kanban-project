@@ -4,3 +4,4 @@ from .task import Task, TaskStage
 from .stage_config import StageConfig
 from .task_history import TaskHistory
 from .help_request import HelpRequest
+from .classes import Class

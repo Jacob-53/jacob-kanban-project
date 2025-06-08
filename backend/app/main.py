@@ -1,17 +1,17 @@
 from fastapi import FastAPI
-from app.database import engine
-from app.routers import user, task, auth, stage
 from sqlalchemy import text
-import asyncio
+from app.database import engine
+from app.routers import user, task, auth, stage, time_tracking, help_request, websocket
 from app.utils.background_tasks import start_background_tasks
-from app.routers import time_tracking
-from app.routers import help_request
-from app.routers import websocket
-
-
 from fastapi.middleware.cors import CORSMiddleware
+from app.routers import classes
+from app.routers.classes import router as classes_router
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 
-
+env_path = Path(__file__).parents[1] / ".env"
+load_dotenv(env_path)
 # FastAPI 앱 생성
 app = FastAPI()
 
@@ -27,10 +27,9 @@ app.add_middleware(
 # 데이터베이스 초기화 함수
 def init_db():
     try:
-        # 직접 SQL로 테이블 생성 (SQLAlchemy 자동 생성 대신)
         with engine.connect() as conn:
-            # 테이블 존재 여부 확인 후 생성
-            tables_check = [
+            # 테이블 생성
+            tables = [
                 """
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
@@ -91,149 +90,63 @@ def init_db():
                     resolved_by INTEGER REFERENCES users(id),
                     resolution_message VARCHAR
                 )
+                """,
+                """
+                CREATE TABLE IF NOT EXISTS classes (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(50) NOT NULL UNIQUE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
                 """
             ]
-            # 테이블 생성 시도
-            for create_stmt in tables_check:
+            for stmt in tables:
                 try:
-                    conn.execute(text(create_stmt))
+                    conn.execute(text(stmt))
                 except Exception as e:
                     print(f"테이블 생성 중 오류 (무시 가능): {e}")
 
-            # 인덱스 생성 (필요한 경우에만, 이미 존재하는 인덱스는 건너뜀)
-            indexes_check = [
+            # 컬럼 추가 (IF NOT EXISTS)
+            alters = [
                 """
                 DO $$
                 BEGIN
                     IF NOT EXISTS (
-                        SELECT 1 FROM pg_indexes
-                        WHERE indexname = 'ix_tasks_title'
+                        SELECT FROM information_schema.columns
+                         WHERE table_name='users' AND column_name='class_id'
                     ) THEN
-                        CREATE INDEX ix_tasks_title ON tasks (title);
+                        ALTER TABLE users
+                          ADD COLUMN class_id INTEGER
+                          REFERENCES classes(id)
+                          ON DELETE SET NULL;
                     END IF;
-                END
-                $$;
+                END $$;
                 """
             ]
-            for index_stmt in indexes_check:
+            for stmt in alters:
                 try:
-                    conn.execute(text(index_stmt))
+                    conn.execute(text(stmt))
+                except Exception as e:
+                    print(f"컬럼 추가 중 오류 (무시 가능): {e}")
+
+            # 인덱스 생성 (옵션)
+            indexes = [
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_indexes WHERE indexname='ix_tasks_title'
+                    ) THEN
+                        CREATE INDEX ix_tasks_title ON tasks(title);
+                    END IF;
+                END $$;
+                """
+            ]
+            for stmt in indexes:
+                try:
+                    conn.execute(text(stmt))
                 except Exception as e:
                     print(f"인덱스 생성 중 오류 (무시 가능): {e}")
-
-            # 기존 테이블에 컬럼 추가 (이미 존재하는 경우 대비)
-            alter_statements = [
-                # task_histories 테이블에 comment 컬럼 추가
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT FROM information_schema.columns
-                        WHERE table_name = 'task_histories' AND column_name = 'comment'
-                    ) THEN
-                        ALTER TABLE task_histories ADD COLUMN comment VARCHAR;
-                    END IF;
-                END $$;
-                """,
-                # help_requests 테이블에 resolution_message 컬럼 추가
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT FROM information_schema.columns
-                        WHERE table_name = 'help_requests' AND column_name = 'resolution_message'
-                    ) THEN
-                        ALTER TABLE help_requests ADD COLUMN resolution_message VARCHAR;
-                    END IF;
-                END $$;
-                """
-            ]
-            for stmt in alter_statements:
-                try:
-                    conn.execute(text(stmt))
-                except Exception as e:
-                    print(f"컬럼 추가 중 오류 (무시 가능): {e}")
-
-            # PostgreSQL용 컬럼 존재 확인 후 추가 (기존 코드 유지)
-            statements = [
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT FROM pg_attribute WHERE attrelid = 'tasks'::regclass AND attname = 'stage') THEN
-                        ALTER TABLE tasks ADD COLUMN stage VARCHAR DEFAULT 'todo';
-                    END IF;
-                END $$;
-                """,
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT FROM pg_attribute WHERE attrelid = 'tasks'::regclass AND attname = 'expected_time') THEN
-                        ALTER TABLE tasks ADD COLUMN expected_time INTEGER DEFAULT 0;
-                    END IF;
-                END $$;
-                """,
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT FROM pg_attribute WHERE attrelid = 'tasks'::regclass AND attname = 'started_at') THEN
-                        ALTER TABLE tasks ADD COLUMN started_at TIMESTAMP;
-                    END IF;
-                END $$;
-                """,
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT FROM pg_attribute WHERE attrelid = 'tasks'::regclass AND attname = 'completed_at') THEN
-                        ALTER TABLE tasks ADD COLUMN completed_at TIMESTAMP;
-                    END IF;
-                END $$;
-                """,
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT FROM pg_attribute WHERE attrelid = 'tasks'::regclass AND attname = 'current_stage_started_at') THEN
-                        ALTER TABLE tasks ADD COLUMN current_stage_started_at TIMESTAMP;
-                    END IF;
-                END $$;
-                """,
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT FROM pg_attribute WHERE attrelid = 'tasks'::regclass AND attname = 'help_needed') THEN
-                        ALTER TABLE tasks ADD COLUMN help_needed BOOLEAN DEFAULT FALSE;
-                    END IF;
-                END $$;
-                """,
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT FROM pg_attribute WHERE attrelid = 'tasks'::regclass AND attname = 'help_requested_at') THEN
-                        ALTER TABLE tasks ADD COLUMN help_requested_at TIMESTAMP;
-                    END IF;
-                END $$;
-                """,
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT FROM pg_attribute WHERE attrelid = 'tasks'::regclass AND attname = 'help_message') THEN
-                        ALTER TABLE tasks ADD COLUMN help_message VARCHAR;
-                    END IF;
-                END $$;
-                """,
-                """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT FROM pg_attribute WHERE attrelid = 'tasks'::regclass AND attname = 'is_delayed') THEN
-                        ALTER TABLE tasks ADD COLUMN is_delayed BOOLEAN DEFAULT FALSE;
-                    END IF;
-                END $$;
-                """
-            ]
-            for stmt in statements:
-                try:
-                    conn.execute(text(stmt))
-                except Exception as e:
-                    print(f"컬럼 추가 중 오류 (무시 가능): {e}")
 
             conn.commit()
         print("데이터베이스 초기화 완료")
@@ -251,14 +164,13 @@ app.include_router(stage.router)
 app.include_router(time_tracking.router)
 app.include_router(help_request.router)
 app.include_router(websocket.router)
+app.include_router(classes.router)
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello, FastAPI!"}
-
-# 앱 시작 시 백그라운드 태스크 실행
+# 백그라운드 태스크 실행
 @app.on_event("startup")
 def startup_event():
     start_background_tasks()
-
