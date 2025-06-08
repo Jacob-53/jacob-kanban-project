@@ -1,4 +1,4 @@
-# app/models/user.py
+# app/models/user.py - Task relationship 수정
 from sqlalchemy import Column, Integer, String, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -13,14 +13,14 @@ class User(Base):
     hashed_password = Column(String)
     is_teacher = Column(Boolean, default=False)
     
-    # 문자열 참조로 유지 (fully-qualified path 사용)
-    tasks = relationship("app.models.task.Task", back_populates="user")
+    # ✅ 수정: Task relationship - 실제 파일 구조에 맞게
+    tasks = relationship("Task", back_populates="user")
     
-    # 다른 relationship들도 필요시 동일하게
+    # 다른 relationship들 (기존 유지)
     help_requests_student = relationship("app.models.help_request.HelpRequest", foreign_keys="app.models.help_request.HelpRequest.user_id", back_populates="student")
     help_requests_teacher = relationship("app.models.help_request.HelpRequest", foreign_keys="app.models.help_request.HelpRequest.resolved_by", back_populates="teacher")
     task_histories = relationship("app.models.task_history.TaskHistory", back_populates="user")
 
-    # 반(class) FK
+    # 반(class) FK (기존 유지 - 잘 되어 있음)
     class_id = Column(Integer, ForeignKey("classes.id", ondelete="SET NULL"), nullable=True)
     class_   = relationship("Class", back_populates="students")

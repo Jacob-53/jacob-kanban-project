@@ -14,8 +14,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import classes
 from app.routers.classes import router as classes_router
 
-
-
 # FastAPI 앱 생성
 app = FastAPI()
 
@@ -34,6 +32,14 @@ def init_db():
         with engine.connect() as conn:
             # 테이블 생성
             tables = [
+                """
+                CREATE TABLE IF NOT EXISTS classes (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(50) NOT NULL UNIQUE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+                """,
                 """
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
@@ -94,14 +100,6 @@ def init_db():
                     resolved_by INTEGER REFERENCES users(id),
                     resolution_message VARCHAR
                 )
-                """,
-                """
-                CREATE TABLE IF NOT EXISTS classes (
-                    id SERIAL PRIMARY KEY,
-                    name VARCHAR(50) NOT NULL UNIQUE,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-                )
                 """
             ]
             for stmt in tables:
@@ -112,6 +110,7 @@ def init_db():
 
             # 컬럼 추가 (IF NOT EXISTS)
             alters = [
+                # 기존 users 테이블에 class_id 추가
                 """
                 DO $$
                 BEGIN
@@ -123,6 +122,34 @@ def init_db():
                           ADD COLUMN class_id INTEGER
                           REFERENCES classes(id)
                           ON DELETE SET NULL;
+                    END IF;
+                END $$;
+                """,
+                # ✅ 새로 추가: tasks 테이블에 class_id 추가
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT FROM information_schema.columns
+                         WHERE table_name='tasks' AND column_name='class_id'
+                    ) THEN
+                        ALTER TABLE tasks
+                          ADD COLUMN class_id INTEGER
+                          REFERENCES classes(id)
+                          ON DELETE SET NULL;
+                    END IF;
+                END $$;
+                """,
+                # ✅ 새로 추가: tasks 테이블에 is_class_task 추가
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT FROM information_schema.columns
+                         WHERE table_name='tasks' AND column_name='is_class_task'
+                    ) THEN
+                        ALTER TABLE tasks
+                          ADD COLUMN is_class_task BOOLEAN DEFAULT FALSE;
                     END IF;
                 END $$;
                 """
