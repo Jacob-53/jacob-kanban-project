@@ -1,33 +1,41 @@
-# app/schemas/user.py - enum 제거하고 String 사용
-from pydantic import BaseModel, field_validator, model_validator
+# app/schemas/user.py
+from pydantic import BaseModel, model_validator, field_validator
 from typing import Optional, Literal
-from app.models.user import UserRole
 
 class UserBase(BaseModel):
     username: str
     email: Optional[str] = None
     is_teacher: bool = False
-    role: UserRole = UserRole.STUDENT  # enum 사용
+    role: Literal["admin", "teacher", "student"] = "student"
 
 class UserCreate(UserBase):
     password: str
-    # 회원가입 시 반 정보
-    class_name: Optional[str] = None
+    # ✅ 회원가입 시 반 정보 입력
+    class_name: Optional[str] = None  # 반 이름으로 입력
     
-    # ✅ 데이터 일관성 체크 (Pydantic v2 방식으로 수정)
+    @field_validator('username')
+    @classmethod
+    def validate_username(cls, v):
+        if len(v) < 3:
+            raise ValueError('사용자명은 3자 이상이어야 합니다')
+        if len(v) > 50:
+            raise ValueError('사용자명은 50자 이하여야 합니다')
+        return v
+    
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 4:
+            raise ValueError('비밀번호는 4자 이상이어야 합니다')
+        return v
+    
     @model_validator(mode='after')
     def validate_role_consistency(self):
         """role과 is_teacher 필드의 일관성 체크"""
-        role = self.role
-        is_teacher = self.is_teacher
-        
-        # role이 teacher면 is_teacher도 True여야 함
-        if role == "teacher" and not is_teacher:
+        if self.role == "teacher" and not self.is_teacher:
             self.is_teacher = True
-        # role이 student나 admin이면 is_teacher는 False
-        elif role in ["student", "admin"] and is_teacher:
+        elif self.role in ["student", "admin"] and self.is_teacher:
             self.is_teacher = False
-            
         return self
 
 class UserUpdate(BaseModel):
@@ -37,55 +45,33 @@ class UserUpdate(BaseModel):
     role: Optional[Literal["admin", "teacher", "student"]] = None
     class_id: Optional[int] = None
     password: Optional[str] = None
-    
-    # ✅ 업데이트 시에도 일관성 체크
-    @model_validator(mode='after')
-    def validate_role_consistency(self):
-        """role과 is_teacher 필드의 일관성 체크"""
-        if self.role is not None and self.is_teacher is not None:
-            role = self.role
-            is_teacher = self.is_teacher
-            
-            # role이 teacher면 is_teacher도 True여야 함
-            if role == "teacher" and not is_teacher:
-                self.is_teacher = True
-            # role이 student나 admin이면 is_teacher는 False
-            elif role in ["student", "admin"] and is_teacher:
-                self.is_teacher = False
-                
-        return self
 
 class UserRead(UserBase):
     id: int
     class_id: Optional[int] = None
-    class_name: Optional[str] = None
+    class_name: Optional[str] = None  # 반 이름도 함께 반환
 
     class Config:
         from_attributes = True
 
-# 관리자용 사용자 정보
-class UserAdmin(UserRead):
-    """관리자가 볼 수 있는 상세한 사용자 정보"""
-    hashed_password: str = "***"
-    created_at: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
-
-# ✅ 추가: 로그인 응답용 스키마
-class UserResponse(UserRead):
-    """로그인 후 반환되는 사용자 정보"""
-    pass
-
-# ✅ 추가: 사용자 목록 조회용 스키마 (비밀번호 제외)
-class UserListItem(BaseModel):
+# ✅ 회원가입 응답용 (민감 정보 제외)
+class UserCreateResponse(BaseModel):
     id: int
     username: str
     email: Optional[str] = None
     is_teacher: bool
-    role: Literal["admin", "teacher", "student"]
+    role: str
     class_id: Optional[int] = None
     class_name: Optional[str] = None
+    message: str = "회원가입이 완료되었습니다"
+    
+    class Config:
+        from_attributes = True
+
+# 관리자용 상세 정보
+class UserAdmin(UserRead):
+    """관리자가 볼 수 있는 상세한 사용자 정보"""
+    created_at: Optional[str] = None
     
     class Config:
         from_attributes = True
