@@ -1,12 +1,10 @@
 # app/models/user.py
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
-from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import relationship
 from app.database import Base
-import enum
 
-# ✅ Python enum (타입 힌트용)
-class UserRole(str, enum.Enum):
+# ✅ Python enum (타입 힌트용으로만 사용)
+class UserRole:
     STUDENT = "student"
     TEACHER = "teacher" 
     ADMIN = "admin"
@@ -21,12 +19,8 @@ class User(Base):
     hashed_password = Column(String)
     is_teacher = Column(Boolean, default=False)
     
-    # ✅ 기존 PostgreSQL enum 직접 참조
-    role = Column(
-        ENUM('admin', 'teacher', 'student', name='userrole', create_type=False),
-        default='student',
-        nullable=False
-    )
+    # ✅ 단순 String 컬럼 (데이터베이스 실제 상태에 맞춤)
+    role = Column(String, default="student", nullable=False)
     
     # 반(class) FK
     class_id = Column(Integer, ForeignKey("classes.id", ondelete="SET NULL"), nullable=True)
@@ -42,7 +36,7 @@ class User(Base):
     task_histories = relationship("app.models.task_history.TaskHistory", back_populates="user")
     class_ = relationship("Class", back_populates="students")
     
-    # 편의 메서드들 (문자열 비교)
+    # 편의 메서드들
     @property
     def is_admin(self) -> bool:
         return self.role == "admin"
