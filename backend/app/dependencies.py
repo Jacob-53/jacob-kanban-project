@@ -1,4 +1,4 @@
-# app/dependencies.py - String 기반 권한 체계 (개선 버전)
+# app/dependencies.py - String 기반 권한 체계 (3단계 개선 버전)
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -7,6 +7,7 @@ from app.models.user import User
 from jose import JWTError, jwt
 import os
 from typing import Optional
+from functools import wraps
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
@@ -77,7 +78,7 @@ def _find_user_by_sub(db: Session, sub: str) -> Optional[User]:
     
     return None
 
-# ✅ 권한 체크 함수들 (String 기반)
+# ✅ 기본 권한 체크 함수들
 
 def get_current_admin(
     current_user: User = Depends(get_current_user)
@@ -143,7 +144,89 @@ def get_current_student_or_teacher(
         )
     return current_user
 
-# ✅ 추가: 자원 소유자 또는 관리자 권한 체크
+# ✅ 3단계 추가: 강화된 관리자 권한 함수들
+
+def get_current_super_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """슈퍼 관리자 권한 체크 (시스템 전체 관리)"""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super administrator privileges required"
+        )
+    return current_user
+
+def get_admin_or_self(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """관리자이거나 본인인 경우만 허용 (사용자 관리용)"""
+    # 이 함수는 라우터에서 target_user_id와 함께 사용
+    return current_user
+
+# ✅ 3단계 추가: 고급 권한 체크 함수들
+
+def check_user_management_permission(
+    current_user: User,
+    target_user_id: int,
+    db: Session = None
+) -> bool:
+    """사용자 관리 권한 체크 (관리자, 교사, 본인)"""
+    # 관리자는 모든 사용자 관리 가능
+    if current_user.role == "admin":
+        return True
+    
+    # 본인 정보는 항상 관리 가능
+    if current_user.id == target_user_id:
+        return True
+    
+    # 교사는 자신의 반 학생들만 관리 가능
+    if current_user.is_teacher and db:
+        target_user = db.get(User, target_user_id)
+        if target_user and target_user.class_id == current_user.class_id and target_user.role == "student":
+            return True
+    
+    return False
+
+def check_class_management_permission(
+    current_user: User,
+    class_id: int = None
+) -> bool:
+    """반 관리 권한 체크"""
+    # 관리자는 모든 반 관리 가능
+    if current_user.role == "admin":
+        return True
+    
+    # 교사는 자신의 반만 관리 가능
+    if current_user.is_teacher:
+        if class_id is None or current_user.class_id == class_id:
+            return True
+    
+    return False
+
+def check_task_management_permission(
+    current_user: User,
+    task_owner_id: int,
+    task_class_id: int = None
+) -> bool:
+    """태스크 관리 권한 체크"""
+    # 관리자는 모든 태스크 관리 가능
+    if current_user.role == "admin":
+        return True
+    
+    # 태스크 소유자는 자신의 태스크 관리 가능
+    if current_user.id == task_owner_id:
+        return True
+    
+    # 교사는 자신의 반 학생들의 태스크 관리 가능
+    if current_user.is_teacher and task_class_id:
+        if current_user.class_id == task_class_id:
+            return True
+    
+    return False
+
+# ✅ 기존 자원 권한 체크 함수들 (유지)
+
 def check_resource_owner_or_admin(
     current_user: User,
     resource_user_id: int
@@ -162,7 +245,6 @@ def check_resource_owner_or_teacher(
     is_teacher = current_user.role == "teacher" or current_user.is_teacher
     return is_owner or is_teacher
 
-# ✅ 추가: 클래스 멤버십 체크 (향후 확장용)
 def check_same_class_or_teacher(
     current_user: User,
     target_user: User
@@ -176,3 +258,116 @@ def check_same_class_or_teacher(
     )
     
     return is_teacher or is_admin or same_class
+
+# ✅ 3단계 추가: 권한 체크 데코레이터들
+
+def require_admin(func):
+    """관리자 권한이 필요한 함수에 사용하는 데코레이터"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        current_user = kwargs.get('current_user')
+        if not current_user or current_user.role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Administrator privileges required"
+            )
+        return func(*args, **kwargs)
+    return wrapper
+
+def require_teacher_or_admin(func):
+    """교사 또는 관리자 권한이 필요한 함수에 사용하는 데코레이터"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        current_user = kwargs.get('current_user')
+        if not current_user or (current_user.role not in ["admin", "teacher"] and not current_user.is_teacher):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Teacher or Administrator privileges required"
+            )
+        return func(*args, **kwargs)
+    return wrapper
+
+def require_same_user_or_admin(func):
+    """본인이거나 관리자 권한이 필요한 함수에 사용하는 데코레이터"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        current_user = kwargs.get('current_user')
+        target_user_id = kwargs.get('user_id') or kwargs.get('target_user_id')
+        
+        if not current_user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required"
+            )
+        
+        if current_user.role != "admin" and current_user.id != target_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You can only access your own resources or need administrator privileges"
+            )
+        
+        return func(*args, **kwargs)
+    return wrapper
+
+# ✅ 3단계 추가: 복합 권한 체크 의존성들
+
+def require_user_management_permission(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> User:
+    """사용자 관리 권한이 있는지 체크하는 의존성"""
+    if not check_user_management_permission(current_user, user_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to manage this user"
+        )
+    return current_user
+
+def require_class_management_permission(
+    class_id: int = None,
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """반 관리 권한이 있는지 체크하는 의존성"""
+    if not check_class_management_permission(current_user, class_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to manage this class"
+        )
+    return current_user
+
+# ✅ 3단계 추가: 사용자 역할 확인 유틸리티
+
+def is_admin(user: User) -> bool:
+    """사용자가 관리자인지 확인"""
+    return user.role == "admin"
+
+def is_teacher(user: User) -> bool:
+    """사용자가 교사인지 확인"""
+    return user.role == "teacher" or user.is_teacher
+
+def is_student(user: User) -> bool:
+    """사용자가 학생인지 확인"""
+    return user.role == "student"
+
+def can_manage_user(manager: User, target_user: User) -> bool:
+    """관리자가 대상 사용자를 관리할 수 있는지 확인"""
+    # 관리자는 모든 사용자 관리 가능
+    if is_admin(manager):
+        return True
+    
+    # 교사는 자신의 반 학생들만 관리 가능
+    if is_teacher(manager) and is_student(target_user):
+        return manager.class_id == target_user.class_id
+    
+    # 본인은 자신의 정보 관리 가능
+    return manager.id == target_user.id
+
+def can_access_class(user: User, class_id: int) -> bool:
+    """사용자가 특정 반에 접근할 수 있는지 확인"""
+    # 관리자는 모든 반 접근 가능
+    if is_admin(user):
+        return True
+    
+    # 해당 반의 멤버(교사 또는 학생)는 접근 가능
+    return user.class_id == class_id
