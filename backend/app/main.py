@@ -13,6 +13,7 @@ from app.utils.background_tasks import start_background_tasks
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import classes
 from app.routers.classes import router as classes_router
+from app.routers import admin
 
 # FastAPI 앱 생성
 app = FastAPI()
@@ -214,6 +215,7 @@ app.include_router(time_tracking.router)
 app.include_router(help_request.router)
 app.include_router(websocket.router)
 app.include_router(classes.router)
+app.include_router(admin.router)
 
 @app.get("/health")
 def health_check():
