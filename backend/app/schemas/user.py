@@ -1,32 +1,37 @@
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, EmailStr
+from typing import Optional, List
 
+# Task schemas
 class TaskBase(BaseModel):
     title: str
     status: str = "TODO"
 
-class Task(TaskBase):
+class TaskRead(TaskBase):
     id: int
     user_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
+# User schemas
 class UserBase(BaseModel):
     username: str
     is_teacher: bool = False
 
-class UserCreate(UserBase):
-    password: str      # ← 추가 JWT
+class UserCreate(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    is_teacher: bool = False
+    class_id: Optional[int] = None
 
 class UserUpdate(UserBase):
-    pass
+    email: Optional[EmailStr] = None
+    class_id: Optional[int] = None
 
-class User(UserBase):
+class UserRead(UserBase):
     id: int
-    tasks: List[Task] = []
+    email: Optional[EmailStr] = None
+    class_id: Optional[int] = None
+    tasks: List[TaskRead] = []
 
-    class Config:
-        from_attributes = True
-
-
+    model_config = {"from_attributes": True}
