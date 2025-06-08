@@ -1,3 +1,10 @@
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+env_path = Path(__file__).parents[1] / ".env"  # ← 가장 먼저
+load_dotenv(env_path)
+
 from fastapi import FastAPI
 from sqlalchemy import text
 from app.database import engine
@@ -6,12 +13,9 @@ from app.utils.background_tasks import start_background_tasks
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import classes
 from app.routers.classes import router as classes_router
-import os
-from pathlib import Path
-from dotenv import load_dotenv
 
-env_path = Path(__file__).parents[1] / ".env"
-load_dotenv(env_path)
+
+
 # FastAPI 앱 생성
 app = FastAPI()
 
