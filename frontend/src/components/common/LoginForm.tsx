@@ -1,72 +1,60 @@
-'use client';
+// src/components/common/LoginForm.tsx
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useAuthStore } from "@/store/authStore";
 
 export default function LoginForm() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const login = useAuthStore((state) => state.login);
+  const setError = useAuthStore((state) => state.setError);
+  const error = useAuthStore((state) => state.error);
+  const isLoading = useAuthStore((state) => state.isLoading);
   const router = useRouter();
-  const { setToken } = useAuth();
 
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    setError(null); // clear error on mount
+  }, [setError]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
-
     try {
-      const res = await fetch('http://localhost:8000/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      if (!res.ok) throw new Error('로그인 실패');
-      const { access_token } = await res.json();
-      setToken(access_token);            // useAuth 훅에 토큰 저장
-      router.push('/help-requests');     // 인증 후 이동할 페이지
-    } catch (err: any) {
-      setError(err.message || '알 수 없는 에러');
-    } finally {
-      setLoading(false);
+      setError(null); // clear error before login
+      await login({ username, password });
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Login failed", err);
+      setError("Invalid username or password");
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 bg-white p-6 rounded-md shadow-md max-w-md mx-auto mt-10">
+      <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Login</h2>
       <div>
-        <label className="block mb-1">아이디</label>
-        <input
-          type="text"
+        <label className="block text-sm font-medium text-gray-700">Username</label>
+        <Input
           value={username}
-          onChange={e => setUsername(e.target.value)}
-          className="w-full border rounded p-2"
+          onChange={(e) => setUsername(e.target.value)}
           required
         />
       </div>
       <div>
-        <label className="block mb-1">비밀번호</label>
-        <input
+        <label className="block text-sm font-medium text-gray-700">Password</label>
+        <Input
           type="password"
           value={password}
-          onChange={e => setPassword(e.target.value)}
-          className="w-full border rounded p-2"
+          onChange={(e) => setPassword(e.target.value)}
           required
         />
       </div>
-      {error && <p className="text-red-600">{error}</p>}
-      <button
-        type="submit"
-        disabled={loading}
-        className={`w-full py-2 rounded text-white ${
-          loading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
-        }`}
-      >
-        {loading ? '로그인 중…' : '로그인'}
-      </button>
+      {error && <p className="text-red-500 text-sm">{error}</p>}
+      <Button type="submit" disabled={isLoading} className="w-full">
+        {isLoading ? "Logging in..." : "Login"}
+      </Button>
     </form>
   );
 }
