@@ -8,8 +8,12 @@ from jose import JWTError, jwt
 import os
 from typing import Optional
 from functools import wraps
+from typing import Optional
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/auth/token", 
+    auto_error=False  # ✅ 자동 에러 비활성화
+)
 
 # ✅ 환경 변수 처리 개선
 SECRET_KEY = (
@@ -25,17 +29,28 @@ ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 if not any([os.getenv("JWT_SECRET_KEY"), os.getenv("JWT_SECRET"), os.getenv("SECRET_KEY")]):
     print("⚠️  [WARNING] JWT Secret key not found in environment variables. Using fallback key for development.")
 
+
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    token: Optional[str] = Depends(oauth2_scheme),  # ✅ Optional[str]로 변경
     db: Session = Depends(get_db)
 ) -> User:
-    """현재 인증된 사용자 정보 반환"""
+    """현재 인증된 사용자 정보 반환 (브라우저 호환성 개선)"""
+    
+    # ✅ 디버깅 로그 추가
+    print(f"🔐 [AUTH] Raw token received: {token}")
+    print(f"🔐 [AUTH] Token type: {type(token)}")
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-
+    
+    # ✅ 토큰 없음 체크 추가
+    if not token:
+        print("❌ [AUTH] No token provided")
+        raise credentials_exception
+    
     try:
         # JWT 토큰 디코딩
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -55,7 +70,9 @@ def get_current_user(
     if not user:
         print(f"❌ [AUTH] User not found for sub: {sub}")
         raise credentials_exception
-        
+    
+    # ✅ 성공 로그 추가    
+    print(f"✅ [AUTH] User authenticated: {user.username} (role={user.role})")
     return user
 
 def _find_user_by_sub(db: Session, sub: str) -> Optional[User]:
