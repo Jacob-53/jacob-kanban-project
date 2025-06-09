@@ -1,11 +1,12 @@
 # app/schemas/task.py - class_id 필드 추가
 from pydantic import BaseModel
 from typing import Optional
+from app.models.task import TaskStage  # 추가: TaskStage Enum import
 
 # 공통 필드 정의
 class TaskBase(BaseModel):
     title: str
-    stage: Optional[str] = "todo"
+    stage: Optional[TaskStage] = TaskStage.TODO  # str → TaskStage로 변경
     description: Optional[str] = None
     expected_time: Optional[int] = 0
 
@@ -19,7 +20,7 @@ class TaskCreate(TaskBase):
 # 업데이트용 모델
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
-    stage: Optional[str] = None
+    stage: Optional[TaskStage] = None  # str → TaskStage로 변경
     description: Optional[str] = None
     expected_time: Optional[int] = None
     # ✅ 새로 추가: 클래스 관련 필드 수정 가능
@@ -42,6 +43,6 @@ class ClassTaskCreate(BaseModel):
     """반 전체에 배정할 Task 생성용 스키마"""
     title: str
     description: Optional[str] = None
-    stage: Optional[str] = "todo"
+    stage: Optional[TaskStage] = TaskStage.TODO  # str → TaskStage로 변경
     expected_time: Optional[int] = 0
     class_id: int  # 필수: 어느 반에 배정할지
