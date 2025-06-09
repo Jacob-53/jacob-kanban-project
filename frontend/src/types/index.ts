@@ -1,13 +1,15 @@
 // src/types/index.ts
-// 기본 ID 타입
 export type ID = number;
 
-// 사용자 관련 타입
+// 사용자 타입 정의
 export interface User {
   id: ID;
   username: string;
-  is_teacher: boolean;
   email?: string;
+  is_teacher: boolean;
+  role: 'admin' | 'teacher' | 'student';  // 명시적 타입 정의
+  class_id?: number;                      // 반 ID 추가
+  class_name?: string;                    // 반 이름 추가
 }
 
 export interface UserLoginRequest {
@@ -20,6 +22,8 @@ export interface UserRegisterRequest {
   password: string;
   is_teacher: boolean;
   email?: string;
+  role?: 'admin' | 'teacher' | 'student';
+  class_name?: string;
 }
 
 export interface AuthResponse {
@@ -27,7 +31,7 @@ export interface AuthResponse {
   token_type: string;
 }
 
-// Task 관련 타입
+// Task 관련 타입들
 export type TaskStage =
   | 'todo'
   | 'requirements'
@@ -51,6 +55,8 @@ export interface Task {
   help_requested_at?: string;
   help_message?: string;
   is_delayed: boolean;
+  class_id?: number;
+  is_class_task?: boolean;
 }
 
 export interface TaskCreate {
@@ -68,39 +74,38 @@ export interface TaskUpdate {
   expected_time?: number;
 }
 
-// 단계 이동 타입
+// Stage 관련 타입들
+export interface StageConfig {
+  id: ID;
+  task_id: ID;
+  stage: TaskStage;
+  expected_time: number;
+  description?: string;
+  order: number;
+}
+
 export interface StageMove {
   stage: TaskStage;
   comment?: string;
 }
 
-// 도움 요청 타입
+// Help Request 관련 타입들
 export interface HelpRequest {
   id: ID;
   task_id: ID;
   user_id: ID;
+  username: string;
+  task_title: string;
   message?: string;
   requested_at: string;
   resolved: boolean;
   resolved_at?: string;
   resolved_by?: ID;
-  resolution_message?: string;
   resolver_name?: string;
-  task_title?: string;
-  username?: string;
+  resolution_message?: string;
 }
 
-export interface CreateHelpRequestPayload {
-  task_id: number;
-  message: string;
-}
-
-export interface ResolveHelpRequestPayload {
-  resolved: boolean;
-  resolution_message: string;
-}
-
-// 이벤트 타입
+// 실시간 업데이트 타입
 export interface TaskUpdateEvent {
   task_id: ID;
   type: 'stage_change' | 'help_request' | 'delay_detected';

@@ -1,7 +1,8 @@
 // src/store/authStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User, UserLoginRequest, UserRegisterRequest } from '../types';
+import { User, UserLoginRequest, UserRegisterRequest } from '@/types'; // 올바른 경로 확인
+
 
 interface AuthState {
   token: string | null;
