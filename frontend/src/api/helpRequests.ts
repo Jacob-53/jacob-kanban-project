@@ -6,26 +6,25 @@ const api = axios.create({
   baseURL: 'http://localhost:8000',
   headers: {
     'Content-Type': 'application/json',
-  }
+  },
 });
 
-api.interceptors.request.use(config => {
+api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
 
-  if (!config.headers || !(config.headers instanceof AxiosHeaders)) {
-    config.headers = AxiosHeaders.from(config.headers || {});
-  }
-
-  if (token) {
+  if (config.headers && config.headers instanceof AxiosHeaders) {
     config.headers.set('Authorization', `Bearer ${token}`);
+  } else {
+    (config.headers as any) = {
+      ...config.headers,
+      Authorization: token ? `Bearer ${token}` : undefined,
+    };
   }
 
   return config;
 });
 
 export default api;
-
-// API 함수들
 
 export const getHelpRequests = async (
   resolved: boolean

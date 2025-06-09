@@ -1,14 +1,17 @@
 // src/hooks/useHelpRequests.ts
 import { useState, useCallback } from 'react';
-import {
+import type {
   HelpRequest,
   CreateHelpRequestPayload,
-  ResolveHelpRequestPayload,
+  ResolveHelpRequestPayload
+} from '@/types'; // ✅ 타입은 types에서
+
+import {
   getHelpRequests,
   getHelpRequest,
   createHelpRequest,
-  resolveHelpRequest,
-} from '../api/helpRequests';
+  resolveHelpRequest
+} from '../api/helpRequests'; // ✅ 함수는 api에서
 
 interface UseHelpRequestsResult {
   helpRequests: HelpRequest[];
@@ -20,7 +23,7 @@ interface UseHelpRequestsResult {
   resolve: (id: number, payload: ResolveHelpRequestPayload) => Promise<HelpRequest | null>;
 }
 
-export const useHelpRequests = (token: string): UseHelpRequestsResult => {
+export const useHelpRequests = (): UseHelpRequestsResult => {
   const [helpRequests, setHelpRequests] = useState<HelpRequest[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
@@ -29,20 +32,20 @@ export const useHelpRequests = (token: string): UseHelpRequestsResult => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getHelpRequests(resolved, token);
+      const data = await getHelpRequests(resolved);
       setHelpRequests(data);
     } catch (err: any) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   const fetchById = useCallback(async (id: number) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getHelpRequest(id, token);
+      const data = await getHelpRequest(id);
       return data;
     } catch (err: any) {
       setError(err);
@@ -50,14 +53,13 @@ export const useHelpRequests = (token: string): UseHelpRequestsResult => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   const create = useCallback(async (payload: CreateHelpRequestPayload) => {
     setLoading(true);
     setError(null);
     try {
-      const newReq = await createHelpRequest(payload, token);
-      // 새로 만든 요청은 목록에 추가
+      const newReq = await createHelpRequest(payload);
       setHelpRequests(prev => [newReq, ...prev]);
       return newReq;
     } catch (err: any) {
@@ -66,14 +68,13 @@ export const useHelpRequests = (token: string): UseHelpRequestsResult => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   const resolve = useCallback(async (id: number, payload: ResolveHelpRequestPayload) => {
     setLoading(true);
     setError(null);
     try {
-      const updated = await resolveHelpRequest(id, payload, token);
-      // 목록에서 상태 업데이트
+      const updated = await resolveHelpRequest(id, payload);
       setHelpRequests(prev =>
         prev.map(hr => (hr.id === id ? updated : hr))
       );
@@ -84,7 +85,7 @@ export const useHelpRequests = (token: string): UseHelpRequestsResult => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   return {
     helpRequests,
