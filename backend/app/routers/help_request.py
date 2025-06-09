@@ -45,19 +45,19 @@ def read_help_requests(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    """
-    도움 요청 목록을 조회합니다.
-    교사는 모든 요청을 볼 수 있고, 학생은 자신의 요청만 볼 수 있습니다.
-    """
-    # 학생이라면 자신의 요청만 볼 수 있도록 제한
     if not current_user.is_teacher:
         user_id = current_user.id
-    
+
     help_requests = get_help_requests(
         db, resolved=resolved, user_id=user_id, task_id=task_id, skip=skip, limit=limit
     )
+
+    # ✨ 디버깅용 로그
+    results = [format_help_request_response(db, hr) for hr in help_requests]
+    print("📦 반환 데이터 샘플:", results[0] if results else "no data")
     
-    return [format_help_request_response(db, hr) for hr in help_requests]
+    return results
+
 
 # 특정 도움 요청 조회 API
 @router.get("/{help_request_id}", response_model=HelpRequestSchema)
