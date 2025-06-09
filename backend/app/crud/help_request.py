@@ -6,7 +6,6 @@ from app.models.user import User
 from app.models.task import Task
 from app.schemas.help_request import HelpRequestCreate, HelpRequestUpdate
 from typing import List, Optional
-from app.utils.websocket_manager import manager
 
 def create_help_request(db: Session, user_id: int, help_request: HelpRequestCreate):
     """
@@ -25,7 +24,7 @@ def create_help_request(db: Session, user_id: int, help_request: HelpRequestCrea
     ).first()
     
     if existing_request:
-        # 이미 요청이、 있으면 메시지만 업데이트
+        # 이미 요청이 있으면 메시지만 업데이트
         if help_request.message:
             existing_request.message = help_request.message
             db.commit()
@@ -49,16 +48,33 @@ def create_help_request(db: Session, user_id: int, help_request: HelpRequestCrea
     db.add(db_help_request)
     db.commit()
     db.refresh(db_help_request)
-    # WebSocket 알림 전송 (비동기 함수를 동기 환경에서 실행)
-    import asyncio
-    asyncio.create_task(
-        manager.send_help_request_notification(
-            help_request_id=db_help_request.id,
-            task_id=db_help_request.task_id,
-            user_id=str(user_id),
-            message=db_help_request.message or "도움이 필요합니다."
-        )
-    )
+    
+    # WebSocket 알림 전송 (안전한 방식으로 처리)
+    try:
+        # WebSocket 매니저가 있을 경우에만 알림 전송
+        from app.utils.websocket_manager import manager
+        # 동기 함수에서 비동기 작업을 안전하게 처리
+        import asyncio
+        loop = None
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            pass
+        
+        if loop and loop.is_running():
+            # 이미 실행 중인 이벤트 루프가 있는 경우
+            asyncio.create_task(
+                manager.send_help_request_notification(
+                    help_request_id=db_help_request.id,
+                    task_id=db_help_request.task_id,
+                    user_id=str(user_id),
+                    message=db_help_request.message or "도움이 필요합니다."
+                )
+            )
+    except Exception as e:
+        print(f"WebSocket 알림 전송 중 오류: {e}")
+        # WebSocket 오류가 있어도 도움 요청은 정상적으로 생성됨
+    
     return db_help_request
 
 def get_help_requests(db: Session, 
@@ -122,17 +138,49 @@ def resolve_help_request(db: Session, help_request_id: int, resolver_id: int,
     
     db.commit()
     db.refresh(help_request)
-    # WebSocket 알림 전송 (비동기 함수를 동기 환경에서 실행)
-    import asyncio
-    asyncio.create_task(
-        manager.send_help_resolved_notification(
-            help_request_id=help_request.id,
-            task_id=help_request.task_id,
-            user_id=str(help_request.user_id),
-            resolver_id=str(resolver_id),
-            resolution_message=update_data.resolution_message or "도움 요청이 해결되었습니다."
-        )
-    )
+    
+    # WebSocket 알림 전송 (안전한 방식으로 처리)
+    try:
+        from app.utils.websocket_manager import manager
+        import asyncio
+        loop = None
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            pass
+        
+        if loop and loop.is_running():
+            asyncio.create_task(
+                manager.send_help_resolved_notification(
+                    help_request_id=help_request.id,
+                    task_id=help_request.task_id,
+                    user_id=str(help_request.user_id),
+                    resolver_id=str(resolver_id),
+                    resolution_message=update_data.resolution_message or "도움 요청이 해결되었습니다."
+                )
+            )
+    except Exception as e:
+        print(f"WebSocket 알림 전송 중 오류: {e}")
+    
+    return help_request
+
+def delete_help_request(db: Session, help_request_id: int):
+    """
+    도움 요청을 삭제합니다.
+    """
+    help_request = get_help_request(db, help_request_id)
+    if not help_request:
+        return None
+    
+    # 관련 태스크의 도움 요청 상태도 업데이트
+    task = db.query(Task).filter(Task.id == help_request.task_id).first()
+    if task:
+        task.help_needed = False
+        task.help_requested_at = None
+        task.help_message = None
+    
+    db.delete(help_request)
+    db.commit()
     return help_request
 
 def format_help_request_response(db: Session, help_request: HelpRequest):
