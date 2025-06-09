@@ -1,3 +1,4 @@
+#backend/main.py
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -54,22 +55,22 @@ def init_db():
                """,
                """
                CREATE TABLE IF NOT EXISTS tasks (
-                   id SERIAL PRIMARY KEY,
-                   title VARCHAR NOT NULL,
-                   description VARCHAR,
-                   user_id INTEGER REFERENCES users(id),
-                   stage VARCHAR DEFAULT 'todo' CHECK (stage IN ('todo', 'requirements', 'design', 'implementation', 'testing', 'review', 'done')),
-                   expected_time INTEGER DEFAULT 0,
-                   started_at TIMESTAMP,
-                   completed_at TIMESTAMP,
-                   current_stage_started_at TIMESTAMP,
-                   help_needed BOOLEAN DEFAULT FALSE,
-                   help_requested_at TIMESTAMP,
-                   help_message VARCHAR,
-                   is_delayed BOOLEAN DEFAULT FALSE,
-                   class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL,
-                   is_class_task BOOLEAN DEFAULT FALSE
-               )
+                    id SERIAL PRIMARY KEY,
+                    title VARCHAR NOT NULL,
+                    description VARCHAR,
+                    user_id INTEGER REFERENCES users(id),
+                    stage VARCHAR DEFAULT 'todo' CHECK (stage IN ('todo', 'TODO', 'requirements', 'REQUIREMENTS', 'design', 'DESIGN', 'implementation', 'IMPLEMENTATION', 'testing', 'TESTING', 'review', 'REVIEW', 'done', 'DONE')),
+                    expected_time INTEGER DEFAULT 0,
+                    started_at TIMESTAMP,
+                    completed_at TIMESTAMP,
+                    current_stage_started_at TIMESTAMP,
+                    help_needed BOOLEAN DEFAULT FALSE,
+                    help_requested_at TIMESTAMP,
+                    help_message VARCHAR,
+                    is_delayed BOOLEAN DEFAULT FALSE,
+                    class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL,
+                    is_class_task BOOLEAN DEFAULT FALSE
+                )
                """,
                """
                CREATE TABLE IF NOT EXISTS stage_configs (

@@ -12,7 +12,7 @@ class TaskBase(BaseModel):
 
 # 요청용 모델
 class TaskCreate(TaskBase):
-    user_id: int
+    user_id: Optional[int] = None  # Required → Optional로 변경
     # ✅ 새로 추가: 클래스 관련 필드
     class_id: Optional[int] = None
     is_class_task: Optional[bool] = False

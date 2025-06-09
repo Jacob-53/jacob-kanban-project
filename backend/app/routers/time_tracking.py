@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
-from app.utils.security import get_current_user
+from app.dependencies import get_current_user
 from app.schemas.time_tracking import DelayStatus, TimeStatistics, UserTimeStatistics
 from app.crud.time_tracking import (
     check_delayed_tasks,

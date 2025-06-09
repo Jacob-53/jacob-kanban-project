@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 
 from app.database import get_db
-from app.utils.security import get_current_user
+from app.dependencies import get_current_user
 from app.models.user import User
 
 from app.crud.help_request import (
@@ -86,10 +86,6 @@ def create_help_request_endpoint(
             status_code=403, 
             detail="You can only request help for your own tasks"
         )
-    
-    # 학생의 경우 user_id를 현재 사용자로 설정
-    if not current_user.is_teacher:
-        help_request.user_id = current_user.id
     
     new_hr = create_help_request(db, current_user.id, help_request)
     if not new_hr:

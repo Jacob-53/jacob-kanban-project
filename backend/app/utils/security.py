@@ -51,15 +51,28 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         print(f"▶ [DEBUG] Trying to decode token starting with: {token[:10] if token else 'None'}...")
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         print(f"▶ [DEBUG] Token decoded successfully: {payload}")
-        username = payload.get("sub")
-        if username is None:
+        user_id = payload.get("sub")
+        if user_id is None:
             raise credentials_exception
+        
+        # 🔧 수정: user_id로 사용자 검색 (username이 아님)
+        try:
+            user_id = int(user_id)  # 문자열을 정수로 변환
+        except (ValueError, TypeError):
+            print(f"▶ [DEBUG] Invalid user_id format: {user_id}")
+            raise credentials_exception
+            
     except JWTError as e:
         # 디버깅: 예외 발생 시 상세 정보 출력
         print(f"▶ [DEBUG] JWT decode error: {str(e)}")
         raise credentials_exception
-    from app.crud.user import get_user_by_username  # 내부에서 import
-    user = get_user_by_username(db, username)
+    
+    # 🔧 수정: ID로 사용자 검색
+    from app.crud.user import get_user  # get_user_by_username 대신 get_user 사용
+    user = get_user(db, user_id)
     if user is None:
+        print(f"▶ [DEBUG] User not found with ID: {user_id}")
         raise credentials_exception
+    
+    print(f"▶ [DEBUG] User found: {user.username} (ID: {user.id})")
     return user

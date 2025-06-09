@@ -30,7 +30,11 @@ def create_task(
     """개별 학생에게 Task를 배정합니다."""
     
     if current_user.is_teacher:
-        # 교사인 경우: 배정하려는 학생이 같은 반인지 확인
+        # 교사인 경우: user_id가 필수
+        if not task.user_id:
+            raise HTTPException(status_code=400, detail="user_id is required for teachers")
+            
+        # 배정하려는 학생이 같은 반인지 확인
         target_user = db.query(User).filter(User.id == task.user_id).first()
         if not target_user:
             raise HTTPException(status_code=404, detail="Target user not found")
@@ -46,12 +50,8 @@ def create_task(
         task.class_id = current_user.class_id
         
     else:
-        # 학생인 경우: 자신에게만 Task 생성 가능
-        if task.user_id != current_user.id:
-            raise HTTPException(
-                status_code=403, 
-                detail="Students can only create tasks for themselves"
-            )
+        # 학생인 경우: 자신의 user_id로 자동 설정
+        task.user_id = current_user.id
         
         # 학생이 만드는 Task는 자신의 반으로 설정
         task.class_id = current_user.class_id
