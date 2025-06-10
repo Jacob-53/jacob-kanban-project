@@ -1,7 +1,8 @@
-// src/store/authStore.ts
+// src/store/authStore.ts (완전 수정된 버전)
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User, UserLoginRequest, UserRegisterRequest } from '@/types';
+import { webSocketService } from '@/lib/websocket'; // WebSocket 서비스 추가
 
 interface AuthState {
   token: string | null;
@@ -9,6 +10,8 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  // WebSocket 관련 상태 추가
+  isWebSocketConnected: boolean;
   setError: (error: string | null) => void;
   clearError: () => void;
   login: (credentials: UserLoginRequest) => Promise<void>;
@@ -16,6 +19,9 @@ interface AuthState {
   logout: () => void;
   loadUser: () => Promise<void>;
   initializeAuth: () => void;
+  // WebSocket 관련 함수 추가
+  connectWebSocket: () => Promise<void>;
+  disconnectWebSocket: () => void;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -28,6 +34,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      isWebSocketConnected: false, // WebSocket 상태 추가
 
       setError: (error) => set({ error }),
       clearError: () => set({ error: null }),
@@ -83,6 +90,14 @@ export const useAuthStore = create<AuthState>()(
 
           // 사용자 정보 로드
           await get().loadUser();
+          
+          // WebSocket 연결 시도 (로그인 성공 후)
+          try {
+            await get().connectWebSocket();
+          } catch (wsError) {
+            console.warn("⚠️ WebSocket 연결 실패 (무시하고 계속):", wsError);
+            // WebSocket 연결 실패해도 로그인 자체는 성공으로 처리
+          }
           
         } catch (error: any) {
           console.error('❌ 로그인 오류:', error);
@@ -144,6 +159,9 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         console.log("🚪 로그아웃");
         
+        // WebSocket 연결 해제
+        get().disconnectWebSocket();
+        
         // 모든 저장된 토큰 정리
         localStorage.removeItem('token');
         document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
@@ -152,6 +170,7 @@ export const useAuthStore = create<AuthState>()(
           user: null, 
           token: null, 
           isAuthenticated: false,
+          isWebSocketConnected: false,
           error: null 
         });
       },
@@ -235,6 +254,62 @@ export const useAuthStore = create<AuthState>()(
             get().logout();
           }
         }
+      },
+
+      // === WebSocket 관련 기능 추가 ===
+      connectWebSocket: async () => {
+        const token = get().token || localStorage.getItem('token');
+        if (!token) {
+          console.warn('⚠️ 토큰이 없어서 WebSocket 연결을 할 수 없습니다');
+          return;
+        }
+
+        if (webSocketService.isConnected()) {
+          console.log('✅ WebSocket이 이미 연결되어 있습니다');
+          set({ isWebSocketConnected: true });
+          return;
+        }
+
+        try {
+          console.log('🔌 WebSocket 연결 시작...');
+          
+          // WebSocket 이벤트 리스너 등록 (한 번만) - ✅ 타입 명시
+          webSocketService.addListener('connected', (data: any) => {
+            console.log('✅ WebSocket 연결 완료');
+            set({ isWebSocketConnected: true });
+          });
+
+          webSocketService.addListener('connection_failed', (data: any) => {
+            console.log('❌ WebSocket 연결 실패');
+            set({ isWebSocketConnected: false });
+          });
+
+          webSocketService.addListener('disconnected', (data: any) => {
+            console.log('🔌 WebSocket 연결 해제됨');
+            set({ isWebSocketConnected: false });
+          });
+
+          // WebSocket 연결
+          webSocketService.connect(token);
+          
+          // 주기적으로 핑 전송 (연결 유지)
+          setInterval(() => {
+            if (webSocketService.isConnected()) {
+              webSocketService.ping();
+            }
+          }, 30000); // 30초마다
+
+        } catch (error) {
+          console.error('❌ WebSocket 연결 실패:', error);
+          set({ isWebSocketConnected: false });
+          // WebSocket 연결 실패는 치명적이지 않으므로 throw하지 않음
+        }
+      },
+
+      disconnectWebSocket: () => {
+        console.log('🔌 WebSocket 연결 해제');
+        webSocketService.disconnect();
+        set({ isWebSocketConnected: false });
       }
     }),
     {
@@ -243,6 +318,7 @@ export const useAuthStore = create<AuthState>()(
         token: state.token,
         user: state.user,
         isAuthenticated: state.isAuthenticated
+        // WebSocket 상태는 persist하지 않음 (세션마다 새로 연결)
       })
     }
   )

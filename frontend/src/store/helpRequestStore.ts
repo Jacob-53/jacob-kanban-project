@@ -31,12 +31,23 @@ interface HelpRequestState {
   isLoading: boolean;
   error: string | null;
   
-  // Actions
+  // 기존 Actions
   fetchHelpRequests: () => Promise<void>;
   getHelpRequest: (id: number) => Promise<HelpRequest | null>;
   createHelpRequest: (payload: CreateHelpRequestPayload) => Promise<HelpRequest | null>;
   resolveHelpRequest: (id: number, payload: ResolveHelpRequestPayload) => Promise<HelpRequest | null>;
   clearError: () => void;
+  
+  // WebSocket 지원을 위한 메서드들 추가
+  addHelpRequest: (helpRequest: HelpRequest) => void;
+  updateHelpRequest: (id: number, updatedData: Partial<HelpRequest>) => void;
+  removeHelpRequest: (id: number) => void;
+  setHelpRequests: (requests: HelpRequest[]) => void;
+  
+  // 통계 메서드들
+  getPendingCount: () => number;
+  getResolvedCount: () => number;
+  getTotalCount: () => number;
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -182,4 +193,42 @@ export const useHelpRequestStore = create<HelpRequestState>()((set, get) => ({
   clearError: () => {
     set({ error: null });
   },
+
+  // WebSocket 지원을 위한 메서드들
+  addHelpRequest: (helpRequest) => {
+    set(state => ({
+      helpRequests: [helpRequest, ...state.helpRequests]
+    }));
+  },
+
+  updateHelpRequest: (id, updatedData) => {
+    set(state => ({
+      helpRequests: state.helpRequests.map(request =>
+        request.id === id ? { ...request, ...updatedData } : request
+      )
+    }));
+  },
+
+  removeHelpRequest: (id) => {
+    set(state => ({
+      helpRequests: state.helpRequests.filter(request => request.id !== id)
+    }));
+  },
+
+  setHelpRequests: (requests) => {
+    set({ helpRequests: requests });
+  },
+
+  // 통계 메서드들
+  getPendingCount: () => {
+    return get().helpRequests.filter(request => !request.resolved).length;
+  },
+
+  getResolvedCount: () => {
+    return get().helpRequests.filter(request => request.resolved).length;
+  },
+
+  getTotalCount: () => {
+    return get().helpRequests.length;
+  }
 }));
