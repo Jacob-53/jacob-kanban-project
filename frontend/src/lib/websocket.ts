@@ -96,7 +96,7 @@ class WebSocketService {
       this.reconnectAttempts = 0;
       this.isReconnecting = false;
 
-      // ✅ JSON 형식으로 인증 메시지 전송
+      // JSON 형식으로 인증 메시지 전송
       const authMessage = { token };
       this.debugLog('info', '인증 메시지 전송', { 
         tokenLength: token.length,
@@ -116,8 +116,15 @@ class WebSocketService {
       this.emitEvent('connected', { status: 'connected' });
     };
 
-    // 메시지 수신
+    // 메시지 수신 (수정됨)
     this.ws.onmessage = (event) => {
+      // ✅ pong 응답 먼저 처리 (JSON 파싱 전에)
+      if (event.data === 'pong') {
+        this.debugLog('info', 'Pong 수신');
+        return;
+      }
+
+      // JSON 메시지 파싱 시도
       try {
         const data = JSON.parse(event.data);
         this.debugLog('info', '메시지 수신', { type: data.type, data });
@@ -129,22 +136,30 @@ class WebSocketService {
           return;
         }
 
+        // 오류 메시지 처리
+        if (data.error) {
+          this.debugLog('error', '서버 오류 메시지', data);
+          this.emitEvent('connection_failed', data);
+          return;
+        }
+
         // 다른 이벤트들 처리
         if (data.type) {
           this.emitEvent(data.type, data);
         }
 
       } catch (error) {
+        // ✅ 안전한 오류 메시지 처리
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
         this.debugLog('warn', '메시지 파싱 실패 - 텍스트로 처리', { 
           raw: event.data, 
-          error 
+          errorMessage,
+          errorType: typeof error
         });
         
-        // pong 응답 처리
-        if (event.data === 'pong') {
-          this.debugLog('info', 'Pong 수신');
-          return;
-        }
+        // 기타 텍스트 메시지는 조용히 무시
+        // (ping/pong 외의 예상치 못한 텍스트 메시지)
       }
     };
 

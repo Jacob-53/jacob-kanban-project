@@ -1,4 +1,4 @@
-// src/components/providers/WebSocketProvider.tsx
+// src/components/providers/WebSocketProvider.tsx (올바른 수정 버전)
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -20,13 +20,13 @@ export default function WebSocketProvider({ children }: WebSocketProviderProps) 
       console.log('🚀 WebSocket 연결 시작 (사용자:', user?.username, ')');
       connectionAttempted.current = true;
       
-      // WebSocket 연결
-      webSocketService.connect(token);
+      // ✅ WebSocket 연결 (파라미터 없이 호출)
+      webSocketService.connect();
       
-      // 주기적으로 ping 보내기 (30초마다)
+      // ✅ 주기적으로 ping 보내기 (30초마다) - 올바른 메서드명
       pingInterval.current = setInterval(() => {
         if (webSocketService.isConnected()) {
-          webSocketService.sendPing();
+          webSocketService.ping(); // ✅ sendPing() → ping()로 수정
         }
       }, 30000);
     }
