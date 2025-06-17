@@ -1,4 +1,4 @@
-# app/routers/help_request.py
+# app/routers/help_request.py (수정됨)
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -7,7 +7,7 @@ from datetime import datetime
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
-from app.models.task import Task  # ✅ 새로 추가: WebSocket에서 사용
+from app.models.task import Task
 from app.models.help_request import HelpRequest as HelpRequestModel
 
 from app.crud.help_request import (
@@ -24,16 +24,17 @@ from app.schemas.help_request import (
     HelpRequestSchema,
     HelpRequestCreate,
     HelpRequestUpdate,
-    HelpRequestResolve,  # ✅ 새로 추가: WebSocket 해결용 스키마
+    HelpRequestResolve,  # ✅ 추가됨
 )
 
-# ✅ WebSocket 매니저 추가 (선택적 - WebSocket 사용 시에만)
+# ✅ WebSocket 매니저 임포트 (오류 처리 포함)
 try:
     from app.utils.websocket_manager import manager
     WEBSOCKET_ENABLED = True
-except ImportError:
+    print("✅ WebSocket manager 로드 성공")
+except ImportError as e:
     WEBSOCKET_ENABLED = False
-    print("⚠️ WebSocket manager not found. WebSocket features disabled.")
+    print(f"⚠️ WebSocket manager not found: {e}. WebSocket features disabled.")
 
 router = APIRouter(
     prefix="/help-requests",
@@ -109,7 +110,7 @@ async def create_help_request_endpoint(  # async 추가
     task.help_message = help_request.message
     db.commit()
     
-    # ✅ WebSocket 브로드캐스트 (선택적)
+    # ✅ WebSocket 브로드캐스트 (오류 처리 강화)
     if WEBSOCKET_ENABLED:
         try:
             # 교사들에게 즉시 알림
@@ -147,10 +148,100 @@ async def create_help_request_endpoint(  # async 추가
             
         except Exception as e:
             print(f"❌ 도움 요청 WebSocket 브로드캐스트 실패: {e}")
+            import traceback
+            traceback.print_exc()
             # WebSocket 실패해도 도움 요청 생성은 성공으로 처리
+    else:
+        print("⚠️ WebSocket이 비활성화되어 있어 브로드캐스트를 건너뜁니다.")
     
     return HelpRequestSchema(**format_help_request_response(db, new_hr))
 
+# ✅ 새로 추가: WebSocket 브로드캐스트가 포함된 해결 엔드포인트
+@router.put("/{help_request_id}/resolve", response_model=HelpRequestSchema)
+async def resolve_help_request_with_websocket(  # async 추가
+    help_request_id: int,
+    resolve_data: HelpRequestResolve,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """도움 요청을 해결합니다. (WebSocket 브로드캐스트 포함)"""
+    
+    if not current_user.is_teacher:
+        raise HTTPException(status_code=403, detail="Only teachers can resolve help requests")
+    
+    help_request_obj = get_help_request(db, help_request_id)
+    if not help_request_obj:
+        raise HTTPException(status_code=404, detail="Help request not found")
+    
+    if help_request_obj.resolved:
+        raise HTTPException(status_code=400, detail="Help request already resolved")
+    
+    # 태스크 조회
+    task = get_task(db, help_request_obj.task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Related task not found")
+    
+    # 도움 요청 해결
+    resolved_request = resolve_help_request(
+        db, help_request_id, current_user.id,
+        HelpRequestUpdate(resolved=True, resolution_message=resolve_data.resolution_message)
+    )
+    
+    if not resolved_request:
+        raise HTTPException(status_code=400, detail="Failed to resolve help request")
+    
+    # ✅ 태스크의 help_needed 플래그 업데이트
+    task.help_needed = False
+    task.help_message = None
+    db.commit()
+    
+    # ✅ WebSocket 브로드캐스트 (오류 처리 강화)
+    if WEBSOCKET_ENABLED:
+        try:
+            # 요청한 학생에게 해결 알림
+            await manager.send_help_resolved_notification(
+                help_request_id=resolved_request.id,
+                task_id=task.id,
+                user_id=str(help_request_obj.user_id),
+                resolver_id=str(current_user.id),
+                resolution_message=resolve_data.resolution_message or "도움 요청이 해결되었습니다"
+            )
+            
+            # 상세한 브로드캐스트 메시지
+            broadcast_data = {
+                "type": "help_request_resolved",
+                "help_request_id": resolved_request.id,
+                "task_id": task.id,
+                "task_title": task.title,
+                "user_id": help_request_obj.user_id,
+                "resolver_id": current_user.id,
+                "resolver_name": current_user.username,
+                "resolution_message": resolve_data.resolution_message,
+                "resolved_at": resolved_request.resolved_at.isoformat() if resolved_request.resolved_at else None,
+                "task": {
+                    "id": task.id,
+                    "title": task.title,
+                    "stage": getattr(task, 'stage', 'unknown'),
+                    "help_needed": False,
+                    "help_message": None
+                }
+            }
+            
+            # 교사들에게 해결 완료 알림
+            await manager.broadcast_to_teachers(broadcast_data)
+            
+            print(f"✅ 도움 요청 해결 WebSocket 브로드캐스트 완료: {resolved_request.id}")
+            
+        except Exception as e:
+            print(f"❌ 도움 요청 해결 WebSocket 브로드캐스트 실패: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print("⚠️ WebSocket이 비활성화되어 있어 브로드캐스트를 건너뜁니다.")
+    
+    return HelpRequestSchema(**format_help_request_response(db, resolved_request))
+
+# 나머지 엔드포인트들 (기존 유지)
 @router.put("/{help_request_id}", response_model=HelpRequestSchema)
 def update_help_request_endpoint(
     help_request_id: int,
@@ -207,84 +298,6 @@ def resolve_help_request_endpoint(
         raise HTTPException(status_code=400, detail="Failed to resolve help request")
     
     return HelpRequestSchema(**format_help_request_response(db, resolved))
-
-# ✅ 새로 추가: WebSocket 브로드캐스트가 포함된 해결 엔드포인트
-@router.put("/{help_request_id}/resolve", response_model=HelpRequestSchema)
-async def resolve_help_request_with_websocket(  # async 추가
-    help_request_id: int,
-    resolve_data: HelpRequestResolve,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """도움 요청을 해결합니다. (WebSocket 브로드캐스트 포함)"""
-    
-    if not current_user.is_teacher:
-        raise HTTPException(status_code=403, detail="Only teachers can resolve help requests")
-    
-    help_request_obj = get_help_request(db, help_request_id)
-    if not help_request_obj:
-        raise HTTPException(status_code=404, detail="Help request not found")
-    
-    # 태스크 조회
-    task = get_task(db, help_request_obj.task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Related task not found")
-    
-    # 도움 요청 해결
-    resolved_request = resolve_help_request(
-        db, help_request_id, current_user.id,
-        HelpRequestUpdate(resolved=True, resolution_message=resolve_data.resolution_message)
-    )
-    
-    if not resolved_request:
-        raise HTTPException(status_code=400, detail="Failed to resolve help request")
-    
-    # ✅ 태스크의 help_needed 플래그 업데이트
-    task.help_needed = False
-    task.help_message = None
-    db.commit()
-    
-    # ✅ WebSocket 브로드캐스트 (선택적)
-    if WEBSOCKET_ENABLED:
-        try:
-            # 요청한 학생에게 해결 알림
-            await manager.send_help_resolved_notification(
-                help_request_id=resolved_request.id,
-                task_id=task.id,
-                user_id=str(help_request_obj.user_id),
-                resolver_id=str(current_user.id),
-                resolution_message=resolve_data.resolution_message or "도움 요청이 해결되었습니다"
-            )
-            
-            # 상세한 브로드캐스트 메시지
-            broadcast_data = {
-                "type": "help_request_resolved",
-                "help_request_id": resolved_request.id,
-                "task_id": task.id,
-                "task_title": task.title,
-                "user_id": help_request_obj.user_id,
-                "resolver_id": current_user.id,
-                "resolver_name": current_user.username,
-                "resolution_message": resolve_data.resolution_message,
-                "resolved_at": resolved_request.resolved_at.isoformat() if resolved_request.resolved_at else None,
-                "task": {
-                    "id": task.id,
-                    "title": task.title,
-                    "stage": getattr(task, 'stage', 'unknown'),
-                    "help_needed": False,
-                    "help_message": None
-                }
-            }
-            
-            # 교사들에게 해결 완료 알림
-            await manager.broadcast_to_teachers(broadcast_data)
-            
-            print(f"✅ 도움 요청 해결 WebSocket 브로드캐스트 완료: {resolved_request.id}")
-            
-        except Exception as e:
-            print(f"❌ 도움 요청 해결 WebSocket 브로드캐스트 실패: {e}")
-    
-    return HelpRequestSchema(**format_help_request_response(db, resolved_request))
 
 @router.delete("/{help_request_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_help_request_endpoint(

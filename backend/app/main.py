@@ -217,6 +217,7 @@ app.include_router(help_request.router)
 app.include_router(websocket.router)
 app.include_router(classes.router)
 app.include_router(admin.router)
+app.include_router(websocket.router, tags=["websocket"])
 
 @app.get("/health")
 def health_check():

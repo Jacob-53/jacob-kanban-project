@@ -1,4 +1,4 @@
-# app/crud/help_request.py
+# app/crud/help_request.py (수정됨)
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.models.help_request import HelpRequest
@@ -6,6 +6,8 @@ from app.models.user import User
 from app.models.task import Task
 from app.schemas.help_request import HelpRequestCreate, HelpRequestUpdate
 from typing import List, Optional
+import asyncio
+import threading
 
 def create_help_request(db: Session, user_id: int, help_request: HelpRequestCreate):
     """
@@ -49,31 +51,9 @@ def create_help_request(db: Session, user_id: int, help_request: HelpRequestCrea
     db.commit()
     db.refresh(db_help_request)
     
-    # WebSocket 알림 전송 (안전한 방식으로 처리)
-    try:
-        # WebSocket 매니저가 있을 경우에만 알림 전송
-        from app.utils.websocket_manager import manager
-        # 동기 함수에서 비동기 작업을 안전하게 처리
-        import asyncio
-        loop = None
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            pass
-        
-        if loop and loop.is_running():
-            # 이미 실행 중인 이벤트 루프가 있는 경우
-            asyncio.create_task(
-                manager.send_help_request_notification(
-                    help_request_id=db_help_request.id,
-                    task_id=db_help_request.task_id,
-                    user_id=str(user_id),
-                    message=db_help_request.message or "도움이 필요합니다."
-                )
-            )
-    except Exception as e:
-        print(f"WebSocket 알림 전송 중 오류: {e}")
-        # WebSocket 오류가 있어도 도움 요청은 정상적으로 생성됨
+    # ✅ WebSocket 알림은 라우터에서 처리하도록 변경
+    # CRUD 레이어에서는 데이터 처리만 담당
+    print(f"✅ 도움 요청 생성 완료: help_request_id={db_help_request.id}")
     
     return db_help_request
 
@@ -85,10 +65,6 @@ def get_help_requests(db: Session,
                      limit: int = 100):
     """
     도움 요청 목록을 조회합니다.
-    필터링 옵션:
-    - resolved: 해결 여부
-    - user_id: 특정 학생의 요청만 조회
-    - task_id: 특정 태스크에 대한 요청만 조회
     """
     query = db.query(HelpRequest)
     
@@ -135,32 +111,13 @@ def resolve_help_request(db: Session, help_request_id: int, resolver_id: int,
     task = db.query(Task).filter(Task.id == help_request.task_id).first()
     if task:
         task.help_needed = False
+        task.help_message = None
     
     db.commit()
     db.refresh(help_request)
     
-    # WebSocket 알림 전송 (안전한 방식으로 처리)
-    try:
-        from app.utils.websocket_manager import manager
-        import asyncio
-        loop = None
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            pass
-        
-        if loop and loop.is_running():
-            asyncio.create_task(
-                manager.send_help_resolved_notification(
-                    help_request_id=help_request.id,
-                    task_id=help_request.task_id,
-                    user_id=str(help_request.user_id),
-                    resolver_id=str(resolver_id),
-                    resolution_message=update_data.resolution_message or "도움 요청이 해결되었습니다."
-                )
-            )
-    except Exception as e:
-        print(f"WebSocket 알림 전송 중 오류: {e}")
+    # ✅ WebSocket 알림은 라우터에서 처리하도록 변경
+    print(f"✅ 도움 요청 해결 완료: help_request_id={help_request.id}")
     
     return help_request
 

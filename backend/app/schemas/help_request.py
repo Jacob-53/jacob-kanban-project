@@ -19,7 +19,8 @@ class HelpRequestResolve(BaseModel):
     resolution_message: Optional[str] = None
     
     class Config:
-        schema_extra = {
+        # ✅ Pydantic v2 호환성
+        json_schema_extra = {
             "example": {
                 "resolution_message": "문제가 해결되었습니다. 다음 단계로 진행하세요."
             }
