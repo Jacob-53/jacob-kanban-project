@@ -26,6 +26,9 @@ interface AuthState {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+// WebSocket 리스너 중복 등록 방지
+let webSocketListenersSetup = false;
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -166,6 +169,9 @@ export const useAuthStore = create<AuthState>()(
         localStorage.removeItem('token');
         document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
         
+        // WebSocket 리스너 설정 플래그 리셋
+        webSocketListenersSetup = false;
+        
         set({ 
           user: null, 
           token: null, 
@@ -273,29 +279,41 @@ export const useAuthStore = create<AuthState>()(
         try {
           console.log('🔌 WebSocket 연결 시작...');
           
-          // WebSocket 이벤트 리스너 등록 (한 번만) - ✅ 타입 명시
-          webSocketService.addListener('connected', (data: any) => {
-            console.log('✅ WebSocket 연결 완료');
-            set({ isWebSocketConnected: true });
-          });
+          // WebSocket 이벤트 리스너 등록 (한 번만)
+          if (!webSocketListenersSetup) {
+            webSocketService.addListener('connected', (data: any) => {
+              console.log('✅ WebSocket 물리적 연결 완료');
+              set({ isWebSocketConnected: true });
+            });
 
-          webSocketService.addListener('connection_failed', (data: any) => {
-            console.log('❌ WebSocket 연결 실패');
-            set({ isWebSocketConnected: false });
-          });
+            webSocketService.addListener('authenticated', (data: any) => {
+              console.log('🎉 WebSocket 인증 성공!', data);
+              set({ isWebSocketConnected: true });
+            });
 
-          webSocketService.addListener('disconnected', (data: any) => {
-            console.log('🔌 WebSocket 연결 해제됨');
-            set({ isWebSocketConnected: false });
-          });
+            webSocketService.addListener('connection_failed', (data: any) => {
+              console.log('❌ WebSocket 연결 실패', data);
+              set({ isWebSocketConnected: false });
+            });
 
-          // WebSocket 연결
-          webSocketService.connect(token);
+            webSocketService.addListener('disconnected', (data: any) => {
+              console.log('🔌 WebSocket 연결 해제됨', data);
+              set({ isWebSocketConnected: false });
+            });
+
+            webSocketListenersSetup = true;
+            console.log('✅ WebSocket 리스너 설정 완료');
+          }
+
+          // ✅ 파라미터 없이 호출 (내부에서 토큰 추출)
+          webSocketService.connect();
           
           // 주기적으로 핑 전송 (연결 유지)
-          setInterval(() => {
+          const pingInterval = setInterval(() => {
             if (webSocketService.isConnected()) {
               webSocketService.ping();
+            } else {
+              clearInterval(pingInterval); // 연결 끊어지면 인터벌 정리
             }
           }, 30000); // 30초마다
 

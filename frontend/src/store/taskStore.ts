@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import api from '../lib/api';
 import { Task, TaskCreate, TaskUpdate, ID, StageMove } from '../types';
-import { webSocketService } from '../lib/websocket';
+import { webSocketService } from '../lib/websocket'; // ✅ 올바른 WebSocket 서비스
 
 interface TaskState {
   tasks: Task[];
@@ -60,6 +60,12 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
         tasks: [...state.tasks, response.data], 
         isLoading: false 
       }));
+      
+      console.log('✅ 태스크 생성 완료:', response.data.id);
+      
+      // WebSocket으로 태스크 생성 이벤트 브로드캐스트 (백엔드에서 처리)
+      // 여기서는 별도 작업 필요 없음
+      
       return response.data;
     } catch (error: any) {
       set({ 
@@ -78,6 +84,9 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
         tasks: state.tasks.map(task => task.id === id ? response.data : task), 
         isLoading: false 
       }));
+      
+      console.log('✅ 태스크 업데이트 완료:', response.data.id);
+      
       return response.data;
     } catch (error: any) {
       set({ 
@@ -96,6 +105,9 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
         tasks: state.tasks.filter(task => task.id !== id), 
         isLoading: false 
       }));
+      
+      console.log('✅ 태스크 삭제 완료:', id);
+      
     } catch (error: any) {
       set({ 
         error: error.response?.data?.detail || '태스크 삭제에 실패했습니다.', 
@@ -130,6 +142,7 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
       console.log('✅ 서버 단계 이동 완료:', response.data);
       
       // 3. WebSocket을 통한 실시간 업데이트를 기다림
+      // 백엔드에서 다른 클라이언트들에게 브로드캐스트할 것임
       // 만약 WebSocket이 연결되어 있지 않다면 수동으로 업데이트
       setTimeout(() => {
         if (!webSocketService.isConnected()) {
@@ -192,15 +205,15 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
   // WebSocket 리스너 설정 (한 번만 실행)
   setupWebSocketListeners: () => {
     if (webSocketListenersSetup) {
-      console.log('⚠️ WebSocket 리스너 이미 설정됨');
+      console.log('⚠️ WebSocket 리스너 이미 설정됨 (TaskStore)');
       return;
     }
     
     console.log('🎧 TaskStore WebSocket 리스너 설정');
     
-    // 태스크 업데이트 이벤트 - ✅ 타입 명시
+    // 태스크 업데이트 이벤트
     webSocketService.addListener('task_update', (taskData: any) => {
-      console.log('📨 WebSocket 태스크 업데이트 수신:', taskData);
+      console.log('📨 WebSocket 태스크 업데이트 수신 (TaskStore):', taskData);
       
       if (taskData.task) {
         // 서버에서 전체 태스크 객체를 받은 경우
@@ -213,9 +226,9 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
       }
     });
 
-    // 태스크 단계 변경 이벤트 - ✅ 타입 명시
+    // 태스크 단계 변경 이벤트
     webSocketService.addListener('task_stage_changed', (taskData: any) => {
-      console.log('📨 WebSocket 태스크 단계 변경 수신:', taskData);
+      console.log('📨 WebSocket 태스크 단계 변경 수신 (TaskStore):', taskData);
       
       if (taskData.task_id) {
         api.get<Task>(`/tasks/${taskData.task_id}`)
@@ -224,16 +237,16 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
       }
     });
 
-    // 태스크 생성 이벤트 - ✅ 타입 명시
+    // 태스크 생성 이벤트
     webSocketService.addListener('task_created', (taskData: any) => {
-      console.log('📨 WebSocket 태스크 생성 수신:', taskData);
+      console.log('📨 WebSocket 태스크 생성 수신 (TaskStore):', taskData);
       // 전체 태스크 목록 새로고침
       get().fetchTasks();
     });
 
-    // 태스크 삭제 이벤트 - ✅ 타입 명시
+    // 태스크 삭제 이벤트
     webSocketService.addListener('task_deleted', (taskData: any) => {
-      console.log('📨 WebSocket 태스크 삭제 수신:', taskData);
+      console.log('📨 WebSocket 태스크 삭제 수신 (TaskStore):', taskData);
       if (taskData.task_id) {
         const currentTasks = get().tasks;
         set({ tasks: currentTasks.filter(task => task.id !== taskData.task_id) });
@@ -241,6 +254,6 @@ export const useTaskStore = create<TaskState>()((set, get) => ({
     });
 
     webSocketListenersSetup = true;
-    console.log('✅ WebSocket 리스너 설정 완료');
+    console.log('✅ TaskStore WebSocket 리스너 설정 완료');
   }
 }));
