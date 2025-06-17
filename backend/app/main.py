@@ -219,14 +219,14 @@ app.include_router(websocket.router, tags=["websocket"])
 print("✅ WebSocket 라우터 등록 완료")
 
 # 나머지 라우터들 등록 (prefix 추가)
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(user.router, prefix="/users", tags=["users"])  
-app.include_router(task.router, prefix="/tasks", tags=["tasks"])
-app.include_router(stage.router, prefix="/stages", tags=["stages"])
-app.include_router(time_tracking.router, prefix="/time-tracking", tags=["time-tracking"])
-app.include_router(help_request.router, prefix="/help-requests", tags=["help-requests"])
-app.include_router(classes.router, prefix="/classes", tags=["classes"])
-app.include_router(admin.router, prefix="/admin", tags=["admin"])
+app.include_router(auth.router, tags=["auth"])           # /auth/token 
+app.include_router(user.router, tags=["users"])         # /users/ 
+app.include_router(task.router, tags=["tasks"])         # /tasks/ 
+app.include_router(stage.router, tags=["stages"])       # /stages/ 
+app.include_router(time_tracking.router, tags=["time-tracking"])   
+app.include_router(help_request.router, tags=["help-requests"])    
+app.include_router(classes.router, tags=["classes"])   
+app.include_router(admin.router, tags=["admin"])
 
 print("✅ 모든 라우터 등록 완료")
 
