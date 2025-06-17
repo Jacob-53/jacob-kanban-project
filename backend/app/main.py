@@ -1,4 +1,4 @@
-#backend/main.py
+#backend/main.py (수정됨)
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -28,7 +28,7 @@ app.add_middleware(
    allow_headers=["*"],
 )
 
-# 데이터베이스 초기화 함수
+# 데이터베이스 초기화 함수 (기존 코드 그대로 유지)
 def init_db():
    try:
        with engine.connect() as conn:
@@ -207,17 +207,28 @@ def init_db():
 # 앱 시작 시 DB 초기화
 init_db()
 
-# 라우터 등록
-app.include_router(user.router)
-app.include_router(task.router)
-app.include_router(auth.router)
-app.include_router(stage.router)
-app.include_router(time_tracking.router)
-app.include_router(help_request.router)
-app.include_router(websocket.router)
-app.include_router(classes.router)
-app.include_router(admin.router)
+# ================================
+# 라우터 등록 (수정됨)
+# ================================
+
+print("🔧 라우터 등록 시작...")
+
+# ✅ WebSocket 라우터를 가장 먼저 등록 (중복 제거)
+print("📡 WebSocket 라우터 등록 중...")
 app.include_router(websocket.router, tags=["websocket"])
+print("✅ WebSocket 라우터 등록 완료")
+
+# 나머지 라우터들 등록 (prefix 추가)
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(user.router, prefix="/users", tags=["users"])  
+app.include_router(task.router, prefix="/tasks", tags=["tasks"])
+app.include_router(stage.router, prefix="/stages", tags=["stages"])
+app.include_router(time_tracking.router, prefix="/time-tracking", tags=["time-tracking"])
+app.include_router(help_request.router, prefix="/help-requests", tags=["help-requests"])
+app.include_router(classes.router, prefix="/classes", tags=["classes"])
+app.include_router(admin.router, prefix="/admin", tags=["admin"])
+
+print("✅ 모든 라우터 등록 완료")
 
 @app.get("/health")
 def health_check():
@@ -226,4 +237,10 @@ def health_check():
 # 백그라운드 태스크 실행
 @app.on_event("startup")
 def startup_event():
+   print("🚀 서버 시작됨")
+   print("📋 등록된 WebSocket 라우트 확인:")
+   for route in app.routes:
+       if hasattr(route, 'path') and '/ws' in route.path:
+           print(f"  🔌 WebSocket: {route.path}")
+   print("=" * 50)
    start_background_tasks()
