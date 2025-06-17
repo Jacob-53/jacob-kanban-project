@@ -24,22 +24,49 @@ async def get_user_from_token(token: str, db: Session):
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         print(f"✅ 토큰 디코딩 성공: {payload}")
         
-        username = payload.get("sub")
-        if username is None:
-            print("❌ 토큰에서 username 추출 실패")
+        subject = payload.get("sub")
+        if subject is None:
+            print("❌ 토큰에서 subject 추출 실패")
             return None
         
-        # 동기 DB 쿼리를 비동기적으로 실행
-        from app.crud.user import get_user_by_username
-        user = await run_in_threadpool(get_user_by_username, db, username)
-        print(f"✅ 사용자 조회 결과: {user.username if user else None}")
-        return user
+        print(f"🔍 Subject 값: '{subject}'")
+        
+        # ✅ subject가 숫자 문자열이면 user_id로 처리
+        if subject.isdigit():
+            user_id = int(subject)
+            print(f"🔢 user_id로 사용자 조회: {user_id}")
+            
+            # user_id로 직접 조회
+            from app.models.user import User
+            user = await run_in_threadpool(
+                lambda: db.query(User).filter(User.id == user_id).first()
+            )
+            
+            if user:
+                print(f"✅ 사용자 조회 성공: {user.username} (id: {user.id})")
+                return user
+            else:
+                print(f"❌ user_id {user_id}에 해당하는 사용자 없음")
+                return None
+        else:
+            # 문자열이면 username으로 처리
+            print(f"👤 username으로 사용자 조회: '{subject}'")
+            from app.crud.user import get_user_by_username
+            user = await run_in_threadpool(get_user_by_username, db, subject)
+            
+            if user:
+                print(f"✅ 사용자 조회 성공: {user.username} (id: {user.id})")
+                return user
+            else:
+                print(f"❌ username '{subject}'에 해당하는 사용자 없음")
+                return None
         
     except JWTError as e:
         print(f"❌ JWT 토큰 디코딩 실패: {e}")
         return None
     except Exception as e:
         print(f"❌ 사용자 정보 추출 중 오류: {e}")
+        import traceback
         traceback.print_exc()
         return None
 
