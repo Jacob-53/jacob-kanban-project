@@ -101,7 +101,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         // 주기적으로 ping 보내기 (30초마다)
         pingInterval.current = setInterval(() => {
           if (webSocketService.isConnected()) {
-            webSocketService.sendPing();
+            webSocketService.ping();
           }
         }, 30000);
       } else {
