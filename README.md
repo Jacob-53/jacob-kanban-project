@@ -191,7 +191,7 @@ Password: 1234
 POST /auth/token
 Content-Type: application/x-www-form-urlencoded
 
-username=student1&password=student123
+username=student3&password=1234
 ```
 
 ### 태스크 관리
@@ -298,15 +298,28 @@ jacob-kanban/
 ```bash
 cd backend
 
-# 가상환경 생성 (선택사항)
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+# Docker Compose로 개발 서버 실행
+docker-compose up -d
 
-# 의존성 설치
-pip install -r requirements.txt
+# 로그 실시간 확인
+docker-compose logs -f backend
 
-# 개발 서버 실행
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# 컨테이너 재시작 (코드 변경 시)
+docker-compose restart backend
+
+# 전체 환경 정리
+docker-compose down
+```
+```bash
+# 백엔드 컨테이너 상태 확인
+docker-compose ps
+
+# 데이터베이스 초기화
+docker-compose down -v  # 볼륨까지 삭제
+docker-compose up -d    # 새로 시작
+
+# 백엔드 컨테이너 접속 (디버깅용)
+docker-compose exec backend bash
 ```
 
 ### 프론트엔드 개발
@@ -381,6 +394,7 @@ docker-compose -f docker-compose.prod.yml up -d backend
 - [ ] 알람기능
 - [ ] 선생님-학생  채팅 기능 구현
 - [ ] 진도 - 빠름,느림,도움요청,에러발생,완료 기능 추가 (알림기능으로)
+- [ ] 간단 칸반 (진도에 따른 범용적인 칸반) 구현
 - [ ] 가독성 수정
 
 ### v0.7 (예정)
