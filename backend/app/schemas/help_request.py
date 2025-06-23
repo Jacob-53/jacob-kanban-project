@@ -13,6 +13,19 @@ class HelpRequestUpdate(BaseModel):
     resolved: bool = True
     resolution_message: Optional[str] = None
 
+# ✅ 새로 추가: 도움 요청 해결용 스키마 (WebSocket 브로드캐스트에서 사용)
+class HelpRequestResolve(BaseModel):
+    """도움 요청 해결 시 사용하는 스키마"""
+    resolution_message: Optional[str] = None
+    
+    class Config:
+        # ✅ Pydantic v2 호환성
+        json_schema_extra = {
+            "example": {
+                "resolution_message": "문제가 해결되었습니다. 다음 단계로 진행하세요."
+            }
+        }
+
 # 도움 요청 응답 스키마
 class HelpRequestSchema(BaseModel):
     id: int

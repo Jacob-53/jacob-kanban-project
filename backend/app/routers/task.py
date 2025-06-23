@@ -1,9 +1,10 @@
-# app/routers/task.py - 권한 체크 강화 및 반별 기능 추가
+# app/routers/task.py - WebSocket 실시간 브로드캐스트 추가
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
 from app.schemas.task import TaskSchema, TaskCreate, TaskUpdate, ClassTaskCreate
+from app.schemas.stage import StageMove  # 단계 이동용 스키마 추가
 from app.models.user import User
 from app.models.task import Task
 from app.crud.task import (
@@ -14,15 +15,17 @@ from app.crud.task import (
     delete_task as delete_task_crud,
 )
 from app.dependencies import get_current_user, get_current_teacher
+from app.utils.websocket_manager import manager  # ✅ WebSocket 매니저 추가
+from datetime import datetime
 
 router = APIRouter(
     prefix="/tasks",
     tags=["tasks"],
 )
 
-# ✅ 개별 태스크 생성 (권한 체크 강화)
+# ✅ 개별 태스크 생성 (WebSocket 브로드캐스트 추가)
 @router.post("/", response_model=TaskSchema)
-def create_task(
+async def create_task(  # async 추가
     task: TaskCreate,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user),
@@ -56,11 +59,146 @@ def create_task(
         # 학생이 만드는 Task는 자신의 반으로 설정
         task.class_id = current_user.class_id
     
-    return create_task_crud(db=db, task=task)
+    # 태스크 생성
+    created_task = create_task_crud(db=db, task=task)
+    
+    # ✅ WebSocket 브로드캐스트: 태스크 생성 알림
+    try:
+        # 태스크 소유자에게 알림
+        await manager.send_personal_message({
+            "type": "task_created",
+            "task_id": created_task.id,
+            "task": {
+                "id": created_task.id,
+                "title": created_task.title,
+                "stage": created_task.stage,
+                "user_id": created_task.user_id,
+                "class_id": created_task.class_id,
+                "is_class_task": created_task.is_class_task
+            }
+        }, str(created_task.user_id))
+        
+        # 교사들에게 알림 (반 전체 모니터링용)
+        await manager.broadcast_to_teachers({
+            "type": "task_created",
+            "task_id": created_task.id,
+            "user_id": created_task.user_id,
+            "class_id": created_task.class_id,
+            "title": created_task.title
+        })
+        
+        print(f"✅ 태스크 생성 WebSocket 브로드캐스트 완료: {created_task.id}")
+    except Exception as e:
+        print(f"❌ 태스크 생성 WebSocket 브로드캐스트 실패: {e}")
+        # WebSocket 실패해도 태스크 생성은 성공으로 처리
+    
+    return created_task
 
-# ✅ 새로 추가: 반 전체에 Task 배정 (교사만 가능)
+# ✅ 새로 추가: 태스크 단계 이동 API (핵심!)
+@router.put("/{task_id}/stage", response_model=dict)
+async def move_task_stage(  # async 추가
+    task_id: int,
+    stage_move: StageMove,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """태스크의 단계를 이동합니다."""
+    
+    # 태스크 존재 확인
+    task = get_task(db, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # 권한 확인: 교사는 자신의 반 태스크, 학생은 자신의 태스크만
+    if current_user.is_teacher:
+        if task.class_id != current_user.class_id:
+            raise HTTPException(status_code=403, detail="Not allowed to move this task")
+    else:
+        if task.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not allowed to move this task")
+    
+    # 유효한 단계인지 확인
+    from app.models.task import TaskStage
+    valid_stages = [stage.value for stage in TaskStage]
+    if stage_move.stage not in valid_stages:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid stage. Valid stages: {valid_stages}"
+        )
+    
+    # 이전 단계 저장
+    previous_stage = task.stage
+    
+    # 단계 이동 수행
+    task.stage = stage_move.stage
+    task.current_stage_started_at = datetime.utcnow()
+    
+    # 완료 단계인 경우
+    if stage_move.stage == TaskStage.DONE:
+        task.completed_at = datetime.utcnow()
+    
+    # 데이터베이스 저장
+    db.commit()
+    db.refresh(task)
+    
+    # ✅ WebSocket 브로드캐스트: 태스크 단계 변경 알림 (핵심!)
+    try:
+        # 모든 관련자에게 실시간 브로드캐스트
+        broadcast_data = {
+            "type": "task_stage_changed",
+            "task_id": task.id,
+            "user_id": task.user_id,
+            "class_id": task.class_id,
+            "previous_stage": previous_stage,
+            "new_stage": task.stage,
+            "changed_by": current_user.id,
+            "changed_by_name": current_user.username,
+            "comment": stage_move.comment,
+            "timestamp": datetime.utcnow().isoformat(),
+            "task": {
+                "id": task.id,
+                "title": task.title,
+                "stage": task.stage,
+                "user_id": task.user_id,
+                "current_stage_started_at": task.current_stage_started_at.isoformat() if task.current_stage_started_at else None,
+                "completed_at": task.completed_at.isoformat() if task.completed_at else None
+            }
+        }
+        
+        # 1. 태스크 소유자에게 알림
+        await manager.send_personal_message(broadcast_data, str(task.user_id))
+        
+        # 2. 교사들에게 알림 (반 전체 모니터링용)
+        await manager.broadcast_to_teachers(broadcast_data)
+        
+        # 3. 같은 반 모든 학생들에게 알림 (실시간 칸반 보드 동기화)
+        if task.class_id:
+            # 같은 반 모든 사용자 조회
+            class_users = db.query(User).filter(User.class_id == task.class_id).all()
+            
+            for user in class_users:
+                if user.id != current_user.id:  # 본인 제외
+                    await manager.send_personal_message(broadcast_data, str(user.id))
+        
+        print(f"✅ 태스크 단계 이동 WebSocket 브로드캐스트 완료: {task.id} ({previous_stage} → {task.stage})")
+        
+    except Exception as e:
+        print(f"❌ 태스크 단계 이동 WebSocket 브로드캐스트 실패: {e}")
+        # WebSocket 실패해도 단계 이동은 성공으로 처리
+    
+    # 응답 반환
+    return {
+        "message": f"Task stage moved to {task.stage}",
+        "task_id": task.id,
+        "previous_stage": previous_stage,
+        "new_stage": task.stage,
+        "changed_by": current_user.username,
+        "comment": stage_move.comment
+    }
+
+# ✅ 새로 추가: 반 전체에 Task 배정 (교사만 가능, WebSocket 브로드캐스트 추가)
 @router.post("/class-task", response_model=List[TaskSchema])
-def create_class_task(
+async def create_class_task(  # async 추가
     class_task: ClassTaskCreate,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_teacher),  # 교사만 가능
@@ -101,9 +239,42 @@ def create_class_task(
         created_task = create_task_crud(db=db, task=task_data)
         created_tasks.append(created_task)
     
+    # ✅ WebSocket 브로드캐스트: 반 전체 과제 생성 알림
+    try:
+        # 각 학생에게 개별 알림
+        for task in created_tasks:
+            await manager.send_personal_message({
+                "type": "class_task_assigned",
+                "task_id": task.id,
+                "class_id": task.class_id,
+                "title": task.title,
+                "assigned_by": current_user.username,
+                "task": {
+                    "id": task.id,
+                    "title": task.title,
+                    "stage": task.stage,
+                    "user_id": task.user_id,
+                    "is_class_task": True
+                }
+            }, str(task.user_id))
+        
+        # 교사들에게 반 과제 생성 알림
+        await manager.broadcast_to_teachers({
+            "type": "class_task_created",
+            "class_id": class_task.class_id,
+            "title": class_task.title,
+            "created_by": current_user.username,
+            "student_count": len(created_tasks)
+        })
+        
+        print(f"✅ 반 전체 과제 생성 WebSocket 브로드캐스트 완료: {len(created_tasks)}개")
+        
+    except Exception as e:
+        print(f"❌ 반 전체 과제 생성 WebSocket 브로드캐스트 실패: {e}")
+    
     return created_tasks
 
-# ✅ 태스크 목록 조회 (권한 체크 강화)
+# ✅ 태스크 목록 조회 (기존 권한 체크 유지)
 @router.get("/", response_model=List[TaskSchema])
 def read_tasks(
     skip: int = 0,
@@ -175,9 +346,9 @@ def read_task(
     
     return task
 
-# ✅ 태스크 업데이트 (기존 로직 유지)
+# ✅ 태스크 업데이트 (WebSocket 브로드캐스트 추가)
 @router.put("/{task_id}", response_model=TaskSchema)
-def update_task(
+async def update_task(  # async 추가
     task_id: int,
     task: TaskUpdate,
     db: Session = Depends(get_db),
@@ -195,11 +366,35 @@ def update_task(
         if existing.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Not allowed")
     
-    return update_task_crud(db, task_id, task)
+    # 태스크 업데이트
+    updated_task = update_task_crud(db, task_id, task)
+    
+    # ✅ WebSocket 브로드캐스트: 태스크 업데이트 알림
+    try:
+        await manager.send_task_update(
+            task_id=updated_task.id,
+            user_id=str(updated_task.user_id),
+            update_type="task_updated",
+            data={
+                "task": {
+                    "id": updated_task.id,
+                    "title": updated_task.title,
+                    "description": updated_task.description,
+                    "stage": updated_task.stage,
+                    "expected_time": updated_task.expected_time
+                },
+                "updated_by": current_user.username
+            }
+        )
+        print(f"✅ 태스크 업데이트 WebSocket 브로드캐스트 완료: {updated_task.id}")
+    except Exception as e:
+        print(f"❌ 태스크 업데이트 WebSocket 브로드캐스트 실패: {e}")
+    
+    return updated_task
 
-# ✅ 태스크 삭제 (교사만 가능, 자신의 반만)
+# ✅ 태스크 삭제 (WebSocket 브로드캐스트 추가)
 @router.delete("/{task_id}", response_model=TaskSchema)
-def delete_task(
+async def delete_task(  # async 추가
     task_id: int,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_teacher),  # 교사만 가능
@@ -215,4 +410,38 @@ def delete_task(
             detail="Can only delete tasks from your own class"
         )
     
-    return delete_task_crud(db, task_id)
+    # 삭제 전 정보 저장
+    deleted_task_info = {
+        "id": existing.id,
+        "title": existing.title,
+        "user_id": existing.user_id,
+        "class_id": existing.class_id
+    }
+    
+    # 태스크 삭제
+    deleted_task = delete_task_crud(db, task_id)
+    
+    # ✅ WebSocket 브로드캐스트: 태스크 삭제 알림
+    try:
+        # 태스크 소유자에게 알림
+        await manager.send_personal_message({
+            "type": "task_deleted",
+            "task_id": deleted_task_info["id"],
+            "title": deleted_task_info["title"],
+            "deleted_by": current_user.username
+        }, str(deleted_task_info["user_id"]))
+        
+        # 같은 반 교사들에게 알림
+        await manager.broadcast_to_teachers({
+            "type": "task_deleted",
+            "task_id": deleted_task_info["id"],
+            "title": deleted_task_info["title"],
+            "class_id": deleted_task_info["class_id"],
+            "deleted_by": current_user.username
+        })
+        
+        print(f"✅ 태스크 삭제 WebSocket 브로드캐스트 완료: {deleted_task_info['id']}")
+    except Exception as e:
+        print(f"❌ 태스크 삭제 WebSocket 브로드캐스트 실패: {e}")
+    
+    return deleted_task
