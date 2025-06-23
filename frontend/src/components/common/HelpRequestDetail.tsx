@@ -2,11 +2,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { HelpRequest, ResolveHelpRequestPayload, useHelpRequestStore } from '@/store/helpRequestStore';
+import { HelpRequest, useHelpRequestStore } from '@/store/helpRequestStore';
 import { useAuthStore } from '@/store/authStore';
+import api from '@/lib/api';
 
 interface Props {
   id: number;
+}
+
+// 해결 요청 페이로드 타입 정의
+interface ResolveHelpRequestPayload {
+  resolution_message?: string;
 }
 
 export default function HelpRequestDetail({ id }: Props) {
@@ -16,7 +22,7 @@ export default function HelpRequestDetail({ id }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { getHelpRequest, resolveHelpRequest } = useHelpRequestStore();
+  const { getHelpRequest } = useHelpRequestStore();
   const { user } = useAuthStore();
 
   useEffect(() => {
@@ -32,6 +38,7 @@ export default function HelpRequestDetail({ id }: Props) {
           setError('도움 요청을 찾을 수 없습니다.');
         }
       } catch (error) {
+        console.error('도움 요청 조회 오류:', error);
         setError('도움 요청을 가져오는 중 오류가 발생했습니다.');
       } finally {
         setIsLoading(false);
@@ -41,23 +48,45 @@ export default function HelpRequestDetail({ id }: Props) {
     fetchHelpRequest();
   }, [id, getHelpRequest]);
 
+  // 직접 API 호출로 해결 처리
   const handleResolve = async () => {
     if (!helpRequest || isResolving) return;
 
     setIsResolving(true);
+    setError(null);
     
     try {
-      const payload: ResolveHelpRequestPayload = {
-        resolution_message: resolutionMessage || undefined,
+      console.log('🔄 도움 요청 해결 시작:', helpRequest.id);
+      
+      // 직접 API 호출 (콘솔에서 성공한 방식과 동일)
+      const response = await api.put(`/help-requests/${helpRequest.id}/resolve`, {
+        resolution_message: resolutionMessage || "문제가 해결되었습니다."
+      });
+
+      console.log('✅ 해결 처리 성공:', response.data);
+
+      // 상태 업데이트
+      const updatedRequest = {
+        ...helpRequest,
+        resolved: true,
+        resolved_at: new Date().toISOString(),
+        resolver_name: user?.username || '알 수 없음',
+        resolution_message: resolutionMessage || "문제가 해결되었습니다."
       };
 
-      const resolvedRequest = await resolveHelpRequest(helpRequest.id, payload);
-      if (resolvedRequest) {
-        setHelpRequest(resolvedRequest);
-        setResolutionMessage('');
-      }
-    } catch (error) {
-      setError('도움 요청 해결 중 오류가 발생했습니다.');
+      setHelpRequest(updatedRequest);
+      setResolutionMessage('');
+      
+      // 성공 메시지
+      alert('도움 요청이 성공적으로 해결되었습니다!');
+
+    } catch (error: any) {
+      console.error('❌ 해결 처리 오류:', error);
+      const errorMessage = error.response?.data?.detail || 
+                          error.message || 
+                          '도움 요청 해결 중 오류가 발생했습니다.';
+      setError(errorMessage);
+      alert(`오류: ${errorMessage}`);
     } finally {
       setIsResolving(false);
     }
@@ -179,6 +208,13 @@ export default function HelpRequestDetail({ id }: Props) {
         </div>
       </div>
 
+      {/* 오류 메시지 표시 */}
+      {error && (
+        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+      )}
+
       {canResolve && !isResolved && (
         <div className="border-t pt-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4">
@@ -194,9 +230,12 @@ export default function HelpRequestDetail({ id }: Props) {
                 id="resolution"
                 value={resolutionMessage}
                 onChange={(e) => setResolutionMessage(e.target.value)}
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 
+                          bg-white text-gray-900 placeholder-gray-500
+                          dark:bg-gray-100 dark:text-gray-900 dark:border-gray-400"
                 rows={4}
                 placeholder="해결 방법이나 답변을 입력하세요..."
+                disabled={isResolving}
               />
             </div>
 
