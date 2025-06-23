@@ -154,27 +154,33 @@ Password: 1234
 ## 📊 주요 화면
 ### 교사 통계보드
 
-![[스크린샷 2025-06-23 23.47.03.png]]
+<img width="1708" alt="스크린샷 2025-06-23 23 47 03" src="https://github.com/user-attachments/assets/b4b8ce40-b8af-4189-91d0-dcc479604dbd" />
+
 
 ### 학생 칸반 보드
 
-![[스크린샷 2025-06-23 23.47.37.png]]
+<img width="1708" alt="스크린샷 2025-06-23 23 47 37" src="https://github.com/user-attachments/assets/6caae84d-4462-4f2b-9962-f8bd0adfa037" />
+
 
 ### 교사 도움 확인 페이지
-![[스크린샷 2025-06-23 23.56.53.png]]
+<img width="1708" alt="스크린샷 2025-06-23 23 56 53" src="https://github.com/user-attachments/assets/99246f7f-59e2-45d5-a0b1-90f4d86b73de" />
+<img width="1708" alt="스크린샷 2025-06-23 23 56 40" src="https://github.com/user-attachments/assets/f99bcd6d-196c-4091-8cf4-4026e1e695b7" />
 
-![[스크린샷 2025-06-23 23.56.40.png]]
 ### 관리자 대시보드
 
-![[스크린샷 2025-06-10 14.12.45.png]]
+<img width="1708" alt="스크린샷 2025-06-10 14 12 45" src="https://github.com/user-attachments/assets/311c5e27-8f43-4119-8eb0-a8e6d2247a19" />
+
 
 ### 관리자 반생성 
 
-![[스크린샷 2025-06-23 23.51.45.png]]
+<img width="1708" alt="스크린샷 2025-06-24 00 06 29" src="https://github.com/user-attachments/assets/38eb57ce-0a11-4716-906b-af8941ff8373" />
+
 
 ### 사용자 ,교사 관리 페이지
-![[스크린샷 2025-06-23 23.53.22.png]]
-![[스크린샷 2025-06-23 23.53.48.png]]
+<img width="1708" alt="스크린샷 2025-06-23 23 53 22" src="https://github.com/user-attachments/assets/fc864864-6565-49b5-8858-d1576faa8d96" />
+<img width="1708" alt="스크린샷 2025-06-24 00 07 47" src="https://github.com/user-attachments/assets/5c7e7660-b319-4617-a0e8-81f7ee46c960" />
+
+
 
 
 ## 📱 API 문서
