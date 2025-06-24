@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket 테스트</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
+        .success { background-color: #d4edda; }
+        .error { background-color: #f8d7da; }
+        .warning { background-color: #fff3cd; }
+        .info { background-color: #d1ecf1; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        button { padding: 8px 12px; margin-right: 8px; }
+        input[type="text"] { padding: 8px; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebSocket 테스트</h1>
+        
+        <div class="card">
+            <h2>연결 설정</h2>
+            <p>
+                <label for="token">JWT 토큰:</label>
+                <input type="text" id="token" placeholder="Bearer 토큰 입력...">
+            </p>
+            <p>
+                <button onclick="connectWebSocket()">WebSocket 연결</button>
+                <button onclick="connectEventsWebSocket()">이벤트 WebSocket 연결</button>
+                <button onclick="disconnectAll()">모든 연결 해제</button>
+            </p>
+        </div>
+        
+        <div class="card">
+            <h2>이벤트 로그</h2>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let eventsSocket = null;
+
+        // WebSocket 연결
+        function connectWebSocket() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                addLog('error', '토큰을 입력하세요.');
+                return;
+            }
+
+            if (socket) {
+                socket.close();
+            }
+
+            socket = new WebSocket('ws://localhost:8000/ws');
+
+            socket.onopen = function(e) {
+                addLog('success', 'WebSocket 연결 성공. 인증 중...');
+                // 인증 메시지 전송
+                socket.send(JSON.stringify({ token: token }));
+            };
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                addLog('info', 'WebSocket 메시지 수신:', data);
+            };
+
+            socket.onclose = function(event) {
+                if (event.wasClean) {
+                    addLog('info', `WebSocket 연결 정상 종료 (code=${event.code}, reason=${event.reason})`);
+                } else {
+                    addLog('error', `WebSocket 연결 오류 (code=${event.code})`);
+                }
+                socket = null;
+            };
+
+            socket.onerror = function(error) {
+                addLog('error', 'WebSocket 오류:', error);
+            };
+
+            // 핑-퐁 메시지로 연결 유지
+            setInterval(() => {
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send('ping');
+                }
+            }, 30000);
+        }
+
+        // 이벤트 WebSocket 연결
+        function connectEventsWebSocket() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                addLog('error', '토큰을 입력하세요.');
+                return;
+            }
+
+            if (eventsSocket) {
+                eventsSocket.close();
+            }
+
+            eventsSocket = new WebSocket('ws://localhost:8000/ws/events');
+
+            eventsSocket.onopen = function(e) {
+                addLog('success', '이벤트 WebSocket 연결 성공. 인증 중...');
+                // 인증 메시지 전송
+                eventsSocket.send(JSON.stringify({ token: token }));
+            };
+
+            eventsSocket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                addLog('warning', '이벤트 수신:', data);
+            };
+
+            eventsSocket.onclose = function(event) {
+                if (event.wasClean) {
+                    addLog('info', `이벤트 WebSocket 연결 정상 종료 (code=${event.code}, reason=${event.reason})`);
+                } else {
+                    addLog('error', `이벤트 WebSocket 연결 오류 (code=${event.code})`);
+                }
+                eventsSocket = null;
+            };
+
+            eventsSocket.onerror = function(error) {
+                addLog('error', '이벤트 WebSocket 오류:', error);
+            };
+
+            // 핑-퐁 메시지로 연결 유지
+            setInterval(() => {
+                if (eventsSocket && eventsSocket.readyState === WebSocket.OPEN) {
+                    eventsSocket.send('ping');
+                }
+            }, 30000);
+        }
+
+        // 모든 연결 해제
+        function disconnectAll() {
+            if (socket) {
+                socket.close();
+                socket = null;
+                addLog('info', 'WebSocket 연결 해제됨');
+            }
+            
+            if (eventsSocket) {
+                eventsSocket.close();
+                eventsSocket = null;
+                addLog('info', '이벤트 WebSocket 연결 해제됨');
+            }
+        }
+
+        // 로그 추가
+        function addLog(type, message, data) {
+            const log = document.getElementById('log');
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            let logContent = `<strong>[${timestamp}]</strong> ${message}`;
+            
+            if (data) {
+                logContent += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            
+            logEntry.innerHTML = logContent;
+            log.prepend(logEntry);
+        }
+    </script>
+</body>
+</html>
